@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -6,42 +6,58 @@ export function useMenu() {
   const [categories, setCategories] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const debounceRef = useRef(null)
 
-  useEffect(() => {
-    fetchAll()
-  }, [])
-
-  async function fetchAll() {
-    setLoading(true)
-    await Promise.all([fetchCategories(), fetchProducts()])
-    setLoading(false)
-  }
-
-  async function fetchCategories() {
+  const fetchCategories = useCallback(async () => {
     const { data, error } = await supabase
       .from('categories')
       .select('*')
+      .eq('is_active', true)
       .order('display_order', { ascending: true })
 
-    if (error) {
-      toast.error('Error cargando categorías')
-      return
-    }
+    if (error) { toast.error('Error cargando categorías'); return }
     setCategories(data)
-  }
+  }, [])
 
-  async function fetchProducts() {
+  const fetchProducts = useCallback(async () => {
     const { data, error } = await supabase
       .from('products')
       .select('*, categories(name)')
       .order('name', { ascending: true })
 
-    if (error) {
-      toast.error('Error cargando productos')
-      return
-    }
+    if (error) { toast.error('Error cargando productos'); return }
     setProducts(data)
-  }
+  }, [])
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true)
+    await Promise.all([fetchCategories(), fetchProducts()])
+    setLoading(false)
+  }, [fetchCategories, fetchProducts])
+
+  const debouncedFetch = useCallback((fetchFn) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(fetchFn, 300)
+  }, [])
+
+  useEffect(() => {
+    fetchAll()
+
+    const channel = supabase
+      .channel('menu_realtime')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'products'
+      }, () => debouncedFetch(fetchProducts))
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'categories'
+      }, () => debouncedFetch(fetchAll))
+      .subscribe()
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      supabase.removeChannel(channel)
+    }
+  }, [fetchAll, fetchProducts, debouncedFetch])
 
   // --- Categorías ---
   async function addCategory(name) {
@@ -52,7 +68,6 @@ export function useMenu() {
 
     if (error) { toast.error('Error creando categoría'); return false }
     toast.success('Categoría creada')
-    await fetchCategories()
     return true
   }
 
@@ -64,7 +79,6 @@ export function useMenu() {
 
     if (error) { toast.error('Error actualizando categoría'); return false }
     toast.success('Categoría actualizada')
-    await fetchCategories()
     return true
   }
 
@@ -81,7 +95,6 @@ export function useMenu() {
 
     if (error) { toast.error('Error eliminando categoría'); return false }
     toast.success('Categoría eliminada')
-    await fetchCategories()
     return true
   }
 
@@ -93,7 +106,6 @@ export function useMenu() {
 
     if (error) { toast.error('Error creando producto'); return false }
     toast.success('Producto creado')
-    await fetchProducts()
     return true
   }
 
@@ -105,7 +117,6 @@ export function useMenu() {
 
     if (error) { toast.error('Error actualizando producto'); return false }
     toast.success('Producto actualizado')
-    await fetchProducts()
     return true
   }
 
@@ -117,7 +128,6 @@ export function useMenu() {
 
     if (error) { toast.error('Error eliminando producto'); return false }
     toast.success('Producto eliminado')
-    await fetchProducts()
     return true
   }
 
@@ -128,7 +138,6 @@ export function useMenu() {
       .eq('id', id)
 
     if (error) { toast.error('Error actualizando disponibilidad'); return false }
-    await fetchProducts()
     return true
   }
 
