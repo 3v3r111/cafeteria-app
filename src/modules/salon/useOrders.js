@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../../shared/lib/supabase'
+import { supabase, syncBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export function useOrders(tableId = null) {
@@ -11,6 +11,7 @@ export function useOrders(tableId = null) {
   const fetchActiveOrder = useCallback(async (tId) => {
     if (!tId) return
     setLoading(true)
+    const timeout = setTimeout(() => setLoading(false), 8000)
 
     const { data, error } = await supabase
       .from('orders')
@@ -27,12 +28,15 @@ export function useOrders(tableId = null) {
       .limit(1)
       .maybeSingle()
 
+    clearTimeout(timeout)
     setLoading(false)
     if (error) { console.error('Error fetching order:', error); return }
     setActiveOrder(data ?? null)
   }, [])
 
   const fetchAllActiveOrders = useCallback(async () => {
+    const timeout = setTimeout(() => setLoading(false), 8000)
+
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -46,7 +50,8 @@ export function useOrders(tableId = null) {
       .in('status', ['pending', 'preparing', 'ready', 'delivered'])
       .order('created_at', { ascending: true })
 
-    if (error) { console.error('Error fetching orders:', error); return }
+    clearTimeout(timeout)
+    if (error) { console.error('Error fetching orders:', error); setLoading(false); return }
     setOrders(data ?? [])
     setLoading(false)
   }, [])
@@ -57,41 +62,38 @@ export function useOrders(tableId = null) {
   }, [])
 
   // Suscripción realtime para cocina (sin tableId)
+  // En el useEffect sin tableId:
   useEffect(() => {
     if (tableId) return
-
     fetchAllActiveOrders()
     setLoading(true)
 
+    const unsubSync = syncBus.subscribe(() => fetchAllActiveOrders())
+
     const channel = supabase
       .channel('orders_kitchen')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' },
-        () => debouncedFetch(fetchAllActiveOrders))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' },
-        () => debouncedFetch(fetchAllActiveOrders))
-      .subscribe()
+      // ... resto igual
 
     return () => {
+      unsubSync()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }
   }, [tableId, fetchAllActiveOrders, debouncedFetch])
 
-  // Suscripción realtime para mesa específica
+// En el useEffect con tableId:
   useEffect(() => {
     if (!tableId) return
-
     fetchActiveOrder(tableId)
+
+    const unsubSync = syncBus.subscribe(() => fetchActiveOrder(tableId))
 
     const channel = supabase
       .channel(`orders_table_${tableId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' },
-        () => debouncedFetch(() => fetchActiveOrder(tableId)))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' },
-        () => debouncedFetch(() => fetchActiveOrder(tableId)))
-      .subscribe()
+      // ... resto igual
 
     return () => {
+      unsubSync()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }

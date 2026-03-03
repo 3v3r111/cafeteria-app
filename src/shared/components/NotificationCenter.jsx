@@ -11,11 +11,12 @@ function timeAgo(date) {
   return `${hours}h`
 }
 
-export default function NotificationCenter({ notifications, unreadCount, onMarkAsRead, onMarkAllAsRead, onClear }) {
+export default function NotificationCenter({
+  notifications, unreadCount, onMarkAsRead, onMarkAllAsRead, onClear
+}) {
   const [open, setOpen] = useState(false)
   const panelRef = useRef(null)
 
-  // Cerrar al hacer click fuera
   useEffect(() => {
     function handleClickOutside(e) {
       if (panelRef.current && !panelRef.current.contains(e.target)) {
@@ -33,8 +34,8 @@ export default function NotificationCenter({ notifications, unreadCount, onMarkA
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="relative p-2 text-gray-400 hover:text-white
-                   hover:bg-gray-700 rounded-xl transition-colors"
+        className="relative p-2 text-gray-500 hover:text-gray-800
+                   hover:bg-gray-100 rounded-xl transition-colors"
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -46,7 +47,7 @@ export default function NotificationCenter({ notifications, unreadCount, onMarkA
         )}
       </button>
 
-      {/* Panel de notificaciones */}
+      {/* Panel — absolute desde el botón */}
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl
                         shadow-2xl border border-gray-100 z-50 overflow-hidden">
@@ -68,33 +69,24 @@ export default function NotificationCenter({ notifications, unreadCount, onMarkA
             </div>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
-                <button
-                  type="button"
-                  onClick={onMarkAllAsRead}
+                <button type="button" onClick={onMarkAllAsRead}
                   className="p-1.5 text-gray-400 hover:text-emerald-600
                              hover:bg-emerald-50 rounded-lg transition-colors"
-                  title="Marcar todas como leídas"
-                >
+                  title="Marcar todas como leídas">
                   <CheckCheck size={14} />
                 </button>
               )}
               {notifications.length > 0 && (
-                <button
-                  type="button"
-                  onClick={onClear}
+                <button type="button" onClick={onClear}
                   className="p-1.5 text-gray-400 hover:text-red-500
                              hover:bg-red-50 rounded-lg transition-colors"
-                  title="Limpiar todas"
-                >
+                  title="Limpiar todas">
                   <Trash2 size={14} />
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
+              <button type="button" onClick={() => setOpen(false)}
                 className="p-1.5 text-gray-400 hover:text-gray-600
-                           hover:bg-gray-100 rounded-lg transition-colors"
-              >
+                           hover:bg-gray-100 rounded-lg transition-colors">
                 <X size={14} />
               </button>
             </div>
@@ -109,39 +101,25 @@ export default function NotificationCenter({ notifications, unreadCount, onMarkA
               </div>
             ) : (
               notifications.map(notif => (
-                <div
-                  key={notif.id}
-                  onClick={() => onMarkAsRead(notif.id)}
+                <div key={notif.id} onClick={() => onMarkAsRead(notif.id)}
                   className={clsx(
                     'flex items-start gap-3 px-4 py-3 cursor-pointer',
                     'border-b border-gray-50 hover:bg-gray-50 transition-colors',
                     !notif.read && 'bg-emerald-50 hover:bg-emerald-100'
-                  )}
-                >
-                  {/* Ícono */}
-                  <div className={clsx(
-                    'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                    'bg-emerald-100 text-emerald-600 mt-0.5'
                   )}>
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center
+                                  justify-center flex-shrink-0 mt-0.5">
                     <span className="text-base">🍽️</span>
                   </div>
-
-                  {/* Contenido */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800">
-                      {notif.title}
-                    </p>
+                    <p className="text-xs font-semibold text-gray-800">{notif.title}</p>
                     <p className="text-xs text-gray-600 mt-0.5">
                       <span className="font-medium text-emerald-700">
                         x{notif.quantity} {notif.productName}
                       </span>
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      📍 {notif.tableLabel}
-                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">📍 {notif.tableLabel}</p>
                   </div>
-
-                  {/* Tiempo y punto de no leído */}
                   <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                     <div className="flex items-center gap-1 text-gray-400">
                       <Clock size={10} />
@@ -156,7 +134,6 @@ export default function NotificationCenter({ notifications, unreadCount, onMarkA
             )}
           </div>
 
-          {/* Footer */}
           {notifications.length > 0 && (
             <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
               <p className="text-xs text-gray-400 text-center">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../../shared/lib/supabase'
+import { supabase, syncBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export function useTables() {
@@ -8,13 +8,16 @@ export function useTables() {
   const debounceRef = useRef(null)
 
   const fetchTables = useCallback(async () => {
+    const timeout = setTimeout(() => setLoading(false), 8000) // timeout de seguridad
+    
     const { data, error } = await supabase
       .from('tables')
       .select('*')
       .eq('is_active', true)
       .order('number', { ascending: true })
 
-    if (error) { toast.error('Error cargando mesas'); return }
+    clearTimeout(timeout)
+    if (error) { toast.error('Error cargando mesas'); setLoading(false); return }
     setTables(data)
     setLoading(false)
   }, [])
@@ -27,21 +30,19 @@ export function useTables() {
     }, 300)
   }, [fetchTables])
 
+  // Dentro del useEffect, después de fetchTables():
   useEffect(() => {
     fetchTables()
 
+    // Escuchar sync manual
+    const unsubSync = syncBus.subscribe(() => fetchTables())
+
     const channel = supabase
       .channel('tables_realtime')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'tables'
-      }, () => debouncedFetch())
-      .subscribe((status) => {
-        console.log('Realtime status:', status)
-      })
+      // ... resto igual
 
     return () => {
+      unsubSync()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }

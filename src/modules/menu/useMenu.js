@@ -9,29 +9,36 @@ export function useMenu() {
   const debounceRef = useRef(null)
 
   const fetchCategories = useCallback(async () => {
+    const timeout = setTimeout(() => {}, 8000)
+
     const { data, error } = await supabase
       .from('categories')
       .select('*')
-      .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    clearTimeout(timeout)
     if (error) { toast.error('Error cargando categorías'); return }
     setCategories(data)
   }, [])
 
   const fetchProducts = useCallback(async () => {
+    const timeout = setTimeout(() => {}, 8000)
+
     const { data, error } = await supabase
       .from('products')
       .select('*, categories(name)')
       .order('name', { ascending: true })
 
+    clearTimeout(timeout)
     if (error) { toast.error('Error cargando productos'); return }
     setProducts(data)
   }, [])
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
+    const timeout = setTimeout(() => setLoading(false), 8000)
     await Promise.all([fetchCategories(), fetchProducts()])
+    clearTimeout(timeout)
     setLoading(false)
   }, [fetchCategories, fetchProducts])
 
