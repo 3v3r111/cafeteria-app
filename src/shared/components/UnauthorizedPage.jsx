@@ -1,4 +1,4 @@
-import { useAuth } from '../../modules/auth/AuthContext'
+import { useAuth } from '../../modules/auth/useAuth'
 
 export default function UnauthorizedPage() {
   const { signOut } = useAuth()

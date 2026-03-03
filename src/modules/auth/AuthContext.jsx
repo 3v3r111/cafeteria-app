@@ -1,12 +1,13 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../../shared/lib/supabase'
 
-const AuthContext = createContext(null)
+export const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const initialized = useRef(false)
 
   async function fetchProfile(userId) {
     const { data, error } = await supabase
@@ -16,38 +17,49 @@ export function AuthProvider({ children }) {
       .single()
 
     if (error) {
-      console.error('Error obteniendo perfil:', error)
+      console.error('fetchProfile error:', error)
       return null
     }
     return data
   }
 
   useEffect(() => {
-    // Obtener sesión inicial
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
+    if (initialized.current) return
+    initialized.current = true
+
+  async function initialize() {
+    // Obtener sesión existente primero
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (session?.user) {
+      setUser(session.user)
+      const profileData = await fetchProfile(session.user.id)
+      setProfile(profileData)
+    }
+
+    setLoading(false)
+
+    // Escuchar cambios futuros
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event)
+
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setProfile(null)
+        return
+      }
+
+      // Solo procesar SIGNED_IN si no hay sesión activa ya
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user)
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
+        return
       }
-      setLoading(false)
     })
+  }
 
-    // Escuchar cambios de sesión (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          const profileData = await fetchProfile(session.user.id)
-          setProfile(profileData)
-        } else {
-          setProfile(null)
-        }
-        setLoading(false)
-      }
-    )
-
-    return () => subscription.unsubscribe()
+    initialize()
   }, [])
 
   async function signIn(email, password) {
@@ -59,8 +71,9 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    const { error } = await supabase.auth.signOut()
-    return { error }
+    setUser(null)
+    setProfile(null)
+    await supabase.auth.signOut()
   }
 
   const value = {
@@ -80,12 +93,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth debe usarse dentro de AuthProvider')
-  }
-  return context
 }
