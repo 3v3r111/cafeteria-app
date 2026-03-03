@@ -1,39 +1,37 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../modules/auth/useAuth'
+import { useNotifications } from '../hooks/useNotifications'
+import NotificationCenter from './NotificationCenter'
 import {
-  LayoutGrid,
-  UtensilsCrossed,
-  BookOpen,
-  CreditCard,
-  Package,
-  BarChart2,
-  Tag,
-  LogOut,
-  Menu,
-  X,
-  ChefHat
+  LayoutGrid, UtensilsCrossed, BookOpen, CreditCard,
+  Package, BarChart2, Tag, LogOut, Menu, X, ChefHat
 } from 'lucide-react'
 import clsx from 'clsx'
 
-// Navegación por rol
 const NAV_ITEMS = {
   admin: [
-    { to: '/salon',      icon: LayoutGrid,      label: 'Salón y Mesas' },
-    { to: '/cocina',     icon: ChefHat,         label: 'Cocina' },
-    { to: '/menu',       icon: BookOpen,        label: 'Menú' },
-    { to: '/pagos',      icon: CreditCard,      label: 'Pagos y Caja' },
-    { to: '/inventario', icon: Package,         label: 'Inventario' },
-    { to: '/finanzas',   icon: BarChart2,       label: 'Finanzas' },
-    { to: '/promociones',icon: Tag,             label: 'Promociones' },
+    { to: '/salon',       icon: LayoutGrid, label: 'Salón y Mesas'  },
+    { to: '/cocina',      icon: ChefHat,    label: 'Cocina'          },
+    { to: '/menu',        icon: BookOpen,   label: 'Menú'            },
+    { to: '/pagos',       icon: CreditCard, label: 'Pagos y Caja'   },
+    { to: '/inventario',  icon: Package,    label: 'Inventario'      },
+    { to: '/finanzas',    icon: BarChart2,  label: 'Finanzas'        },
+    { to: '/promociones', icon: Tag,        label: 'Promociones'     },
   ],
   waiter: [
-    { to: '/salon',      icon: LayoutGrid,      label: 'Salón y Mesas' },
-    { to: '/pagos',      icon: CreditCard,      label: 'Pagos y Caja' },
+    { to: '/salon', icon: LayoutGrid, label: 'Salón y Mesas' },
+    { to: '/pagos', icon: CreditCard, label: 'Pagos y Caja'  },
   ],
   kitchen: [
-    { to: '/cocina',     icon: ChefHat,         label: 'Cocina' },
+    { to: '/cocina', icon: ChefHat, label: 'Cocina' },
   ],
+}
+
+const ROLE_LABEL = {
+  admin:   'Administrador',
+  waiter:  'Mesero',
+  kitchen: 'Cocina',
 }
 
 export default function Layout({ children }) {
@@ -41,13 +39,11 @@ export default function Layout({ children }) {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const navItems = NAV_ITEMS[profile?.role] ?? []
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } =
+    useNotifications(profile?.role)
 
-  const roleLabel = {
-    admin:   'Administrador',
-    waiter:  'Mesero',
-    kitchen: 'Cocina',
-  }
+  const navItems = NAV_ITEMS[profile?.role] ?? []
+  const showNotifications = profile?.role === 'admin' || profile?.role === 'waiter'
 
   async function handleSignOut() {
     await signOut()
@@ -73,43 +69,48 @@ export default function Layout({ children }) {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
 
-        {/* Header del sidebar */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-700">
+        {/* Header sidebar */}
+        <div className="flex items-center justify-between px-6 py-5
+                        border-b border-gray-700">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center">
               <span className="text-lg">☕</span>
             </div>
             <div>
-              <p className="text-white font-semibold text-sm leading-tight">
-                Cafetería
-              </p>
-              <p className="text-gray-400 text-xs">
-                Sistema interno
-              </p>
+              <p className="text-white font-semibold text-sm leading-tight">Cafetería</p>
+              <p className="text-gray-400 text-xs">Sistema interno</p>
             </div>
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-gray-400 hover:text-white transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Campana de notificaciones en sidebar */}
+            {showNotifications && (
+              <NotificationCenter
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onClear={clearAll}
+              />
+            )}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden text-gray-400 hover:text-white transition-colors p-1"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        {/* Perfil del usuario */}
+        {/* Perfil */}
         <div className="px-6 py-4 border-b border-gray-700">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-emerald-600 rounded-full flex items-center 
+            <div className="w-9 h-9 bg-emerald-600 rounded-full flex items-center
                             justify-center text-white font-semibold text-sm">
               {profile?.name?.charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden">
-              <p className="text-white text-sm font-medium truncate">
-                {profile?.name}
-              </p>
-              <p className="text-emerald-400 text-xs">
-                {roleLabel[profile?.role]}
-              </p>
+              <p className="text-white text-sm font-medium truncate">{profile?.name}</p>
+              <p className="text-emerald-400 text-xs">{ROLE_LABEL[profile?.role]}</p>
             </div>
           </div>
         </div>
@@ -150,29 +151,40 @@ export default function Layout({ children }) {
             Cerrar sesión
           </button>
         </div>
-
       </aside>
 
       {/* Contenido principal */}
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* Topbar — solo visible en móvil/tablet */}
+        {/* Topbar móvil */}
         <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3
-                           flex items-center gap-3 shadow-sm">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <Menu size={24} />
-          </button>
-          <span className="font-semibold text-gray-800">Cafetería</span>
+                           flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <Menu size={24} />
+            </button>
+            <span className="font-semibold text-gray-800">Cafetería</span>
+          </div>
+          {showNotifications && (
+            <div className="[&_button]:text-gray-600 [&_button:hover]:text-gray-900
+                            [&_button:hover]:bg-gray-100">
+              <NotificationCenter
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onClear={clearAll}
+              />
+            </div>
+          )}
         </header>
 
-        {/* Área de contenido */}
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
-
       </div>
     </div>
   )

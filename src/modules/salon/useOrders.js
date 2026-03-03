@@ -102,18 +102,34 @@ export function useOrders(tableId = null) {
   }, [tableId, fetchActiveOrder, debouncedFetch])
 
   async function createOrder(tId, items) {
-    // 1. Crear la orden
-    const { data: order, error: orderError } = await supabase
+    // 1. Verificar que no haya orden activa ya
+    const { data: existing } = await supabase
       .from('orders')
-      .insert({ table_id: tId, status: 'pending' })
-      .select()
-      .single()
+      .select('id')
+      .eq('table_id', tId)
+      .in('status', ['pending', 'preparing', 'ready', 'delivered'])
+      .limit(1)
 
-    if (orderError) { toast.error('Error creando orden'); return false }
+    let orderId
 
-    // 2. Insertar los items
+    if (existing && existing.length > 0) {
+      // Ya existe una orden, agregar items a ella
+      orderId = existing[0].id
+    } else {
+      // Crear nueva orden
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({ table_id: tId, status: 'pending' })
+        .select()
+        .single()
+
+      if (orderError) { toast.error('Error creando orden'); return false }
+      orderId = order.id
+    }
+
+    // 2. Insertar items
     const orderItems = items.map(item => ({
-      order_id: order.id,
+      order_id: orderId,
       product_id: item.product_id,
       quantity: item.quantity,
       unit_price: item.unit_price,
@@ -127,7 +143,7 @@ export function useOrders(tableId = null) {
 
     if (itemsError) { toast.error('Error enviando items'); return false }
 
-    // 3. Marcar mesa como ocupada
+    // 3. Marcar mesa como ocupada siempre que haya orden activa
     await supabase
       .from('tables')
       .update({ status: 'occupied' })
