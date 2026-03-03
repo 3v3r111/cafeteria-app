@@ -1,7 +1,14 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../modules/auth/useAuth'
 
 export default function UnauthorizedPage() {
   const { signOut } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleSignOut() {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -10,7 +17,7 @@ export default function UnauthorizedPage() {
         <p className="text-gray-700 font-semibold mt-2">Acceso no autorizado</p>
         <p className="text-gray-500 mt-1">No tienes permisos para ver esta página.</p>
         <button
-          onClick={signOut}
+          onClick={handleSignOut}
           className="mt-4 px-4 py-2 bg-emerald-500 text-white rounded-lg 
                      hover:bg-emerald-600 transition-colors"
         >

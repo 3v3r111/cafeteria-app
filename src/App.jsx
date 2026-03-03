@@ -6,6 +6,9 @@ import { AuthProvider } from './modules/auth/AuthContext'
 import ProtectedRoute from './shared/components/ProtectedRoute'
 import LoginPage from './modules/auth/LoginPage'
 
+// Layout
+import Layout from './shared/components/Layout'
+
 // Páginas
 import SalonPage from './modules/salon/SalonPage'
 import KitchenPage from './modules/kitchen/KitchenPage'
@@ -19,64 +22,71 @@ import PromotionsPage from './modules/promotions/PromotionsPage'
 import NotFoundPage from './shared/components/NotFoundPage'
 import UnauthorizedPage from './shared/components/UnauthorizedPage'
 
+function ProtectedLayout({ children, allowedRoles }) {
+  return (
+    <ProtectedRoute allowedRoles={allowedRoles}>
+      <Layout>
+        {children}
+      </Layout>
+    </ProtectedRoute>
+  )
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <Toaster position="top-right" />
       <Routes>
-        {/* Ruta pública */}
+        {/* Rutas públicas */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/no-autorizado" element={<UnauthorizedPage />} />
-
-        {/* Redirigir raíz al salón */}
         <Route path="/" element={<Navigate to="/salon" replace />} />
 
-        {/* Rutas protegidas — Mesero y Admin */}
+        {/* Mesero y Admin */}
         <Route path="/salon" element={
-          <ProtectedRoute allowedRoles={['admin', 'waiter']}>
+          <ProtectedLayout allowedRoles={['admin', 'waiter']}>
             <SalonPage />
-          </ProtectedRoute>
+          </ProtectedLayout>
         } />
 
         <Route path="/pagos" element={
-          <ProtectedRoute allowedRoles={['admin', 'waiter']}>
+          <ProtectedLayout allowedRoles={['admin', 'waiter']}>
             <PaymentsPage />
-          </ProtectedRoute>
+          </ProtectedLayout>
         } />
 
-        {/* Rutas protegidas — Cocina y Admin */}
+        {/* Cocina y Admin */}
         <Route path="/cocina" element={
-          <ProtectedRoute allowedRoles={['admin', 'kitchen']}>
+          <ProtectedLayout allowedRoles={['admin', 'kitchen']}>
             <KitchenPage />
-          </ProtectedRoute>
+          </ProtectedLayout>
         } />
 
-        {/* Rutas protegidas — Solo Admin */}
+        {/* Solo Admin */}
         <Route path="/menu" element={
-          <ProtectedRoute allowedRoles={['admin']}>
+          <ProtectedLayout allowedRoles={['admin']}>
             <MenuPage />
-          </ProtectedRoute>
+          </ProtectedLayout>
         } />
 
         <Route path="/inventario" element={
-          <ProtectedRoute allowedRoles={['admin']}>
+          <ProtectedLayout allowedRoles={['admin']}>
             <InventoryPage />
-          </ProtectedRoute>
+          </ProtectedLayout>
         } />
 
         <Route path="/finanzas" element={
-          <ProtectedRoute allowedRoles={['admin']}>
+          <ProtectedLayout allowedRoles={['admin']}>
             <FinancePage />
-          </ProtectedRoute>
+          </ProtectedLayout>
         } />
 
         <Route path="/promociones" element={
-          <ProtectedRoute allowedRoles={['admin']}>
+          <ProtectedLayout allowedRoles={['admin']}>
             <PromotionsPage />
-          </ProtectedRoute>
+          </ProtectedLayout>
         } />
 
-        {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AuthProvider>

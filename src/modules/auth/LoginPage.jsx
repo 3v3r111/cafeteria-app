@@ -16,7 +16,12 @@ export default function LoginPage() {
   // Redirigir si ya hay sesión activa — usando useEffect para evitar loops
   useEffect(() => {
     if (!loading && user && profile) {
-      navigate('/salon', { replace: true })
+      // Redirigir según rol
+      if (profile.role === 'kitchen') {
+        navigate('/cocina', { replace: true })
+      } else {
+        navigate('/salon', { replace: true })
+      }
     }
   }, [user, profile, loading, navigate])
 
