@@ -28,7 +28,19 @@ export default function TableCard({ table, isAdmin, onSelect, onEdit, onDelete, 
       setHasActiveOrder(data && data.length > 0)
     }
     checkActiveOrder()
-  }, [table.id, table.status])
+
+      // Suscripción para detectar cuando se cierra la orden
+    const channel = supabase
+      .channel(`table_order_${table.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'orders',
+        filter: `table_id=eq.${table.id}`
+      }, () => checkActiveOrder())
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [table.id])
+
 
   const otherStatuses = Object.entries(STATUS_CONFIG)
     .filter(([key]) => key !== table.status)

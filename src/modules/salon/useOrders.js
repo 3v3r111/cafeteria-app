@@ -25,14 +25,10 @@ export function useOrders(tableId = null) {
       .in('status', ['pending', 'preparing', 'ready', 'delivered'])
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     setLoading(false)
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching order:', error)
-      return
-    }
+    if (error) { console.error('Error fetching order:', error); return }
     setActiveOrder(data ?? null)
   }, [])
 
@@ -209,6 +205,22 @@ export function useOrders(tableId = null) {
     return true
   }
 
+  async function clearPaidOrders() {
+    // Marcar como paid todas las órdenes donde todos los items están listos/entregados
+    const ordersToCheck = orders.filter(o =>
+      o.order_items?.every(i => i.status === 'ready' || i.status === 'delivered')
+    )
+
+    for (const order of ordersToCheck) {
+      await supabase
+        .from('orders')
+        .update({ status: 'paid' })
+        .eq('id', order.id)
+    }
+
+    await fetchAllActiveOrders()
+  }
+
   return {
     orders,
     activeOrder,
@@ -219,6 +231,7 @@ export function useOrders(tableId = null) {
     updateOrderStatus,
     cancelOrderItem,
     fetchActiveOrder,
-    fetchAllActiveOrders
+    fetchAllActiveOrders,
+    clearPaidOrders
   }
 }
