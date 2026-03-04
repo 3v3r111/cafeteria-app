@@ -126,7 +126,7 @@ export function useInventory() {
       .from('inventory_movements')
       .insert({
         item_id: itemId,
-        type: 'in',
+        type: 'purchase',
         quantity: Number(quantity),
         unit_cost: Number(unitCost || item.cost_per_unit),
         total_cost: totalCost,
@@ -184,7 +184,7 @@ export function useInventory() {
       .from('inventory_movements')
       .insert({
         item_id: itemId,
-        type: 'out',
+        type: 'loss',
         quantity: Number(quantity),
         unit_cost: Number(item.cost_per_unit),
         total_cost: Number(quantity) * Number(item.cost_per_unit),
