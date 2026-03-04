@@ -3,13 +3,13 @@ import { supabase } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export const EXPENSE_CATEGORIES = [
-  { id: 'nomina',      label: 'Nómina',             icon: '👥' },
-  { id: 'inventario',  label: 'Inventario',          icon: '📦' },
-  { id: 'renta',       label: 'Renta',               icon: '🏠' },
-  { id: 'servicios',   label: 'Servicios (luz/agua)', icon: '💡' },
-  { id: 'mantenimiento', label: 'Mantenimiento',     icon: '🔧' },
-  { id: 'marketing',   label: 'Marketing',           icon: '📣' },
-  { id: 'otro',        label: 'Otro',                icon: '📋' },
+  { id: 'payroll',     label: 'Nómina',              icon: '👥' },
+  { id: 'inventory',   label: 'Inventario',           icon: '📦' },
+  { id: 'rent',        label: 'Renta',                icon: '🏠' },
+  { id: 'utilities',   label: 'Servicios (luz/agua)', icon: '💡' },
+  { id: 'maintenance', label: 'Mantenimiento',        icon: '🔧' },
+  { id: 'marketing',   label: 'Marketing',            icon: '📣' },
+  { id: 'other',       label: 'Otro',                 icon: '📋' },
 ]
 
 export function useFinance() {

@@ -126,7 +126,7 @@ export function useInventory() {
       .from('inventory_movements')
       .insert({
         item_id: itemId,
-        type: 'purchase',
+        type: 'in',
         quantity: Number(quantity),
         unit_cost: Number(unitCost || item.cost_per_unit),
         total_cost: totalCost,
@@ -152,11 +152,12 @@ export function useInventory() {
     // 3. Registrar como egreso si tiene costo
     if (totalCost > 0) {
       const { data: { user } } = await supabase.auth.getUser()
-      await supabase
+      const { error: expError } = await supabase
         .from('expenses')
         .insert({
-          category: 'inventario',
-          description: `Compra: ${item.name} (${quantity} ${item.unit})`,
+          category: 'inventory',
+          subcategory: item.name,
+          description: `Entrada: ${Number(quantity)} ${item.unit} de ${item.name} a $${Number(unitCost || item.cost_per_unit).toFixed(2)} c/u`,
           amount: totalCost,
           date: new Date().toISOString().split('T')[0],
           user_id: user?.id
@@ -183,7 +184,7 @@ export function useInventory() {
       .from('inventory_movements')
       .insert({
         item_id: itemId,
-        type: 'loss',
+        type: 'out',
         quantity: Number(quantity),
         unit_cost: Number(item.cost_per_unit),
         total_cost: Number(quantity) * Number(item.cost_per_unit),
