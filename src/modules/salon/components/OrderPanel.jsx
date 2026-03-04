@@ -43,6 +43,21 @@ export default function OrderPanel({ table, categories, products, onClose, onGoT
     if (!error) setRemovingItem(null)
   }
 
+  // Agrega la función después de handleRemoveItem
+  async function handleCancelOrder() {
+    if (!activeOrder) return
+    const { supabase } = await import('../../../shared/lib/supabase')
+
+    // Eliminar todos los items
+    await supabase
+      .from('order_items')
+      .delete()
+      .eq('order_id', activeOrder.id)
+
+    // El trigger se encarga de cancelar la orden y liberar la mesa
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end">
       <div className="w-full max-w-lg bg-white h-full flex flex-col shadow-2xl">
@@ -165,11 +180,11 @@ export default function OrderPanel({ table, categories, products, onClose, onGoT
                                 'p-1.5 rounded-lg transition-colors',
                                 isRemoving
                                   ? 'text-red-500 bg-red-100'
-                                  : 'text-gray-300 hover:text-red-400 hover:bg-red-50'
+                                  : 'text-gray-400 hover:text-red-400 hover:bg-red-50'
                               )}
                               title="Quitar producto"
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </div>
@@ -221,16 +236,24 @@ export default function OrderPanel({ table, categories, products, onClose, onGoT
         {/* Footer */}
         <div className="flex-shrink-0 border-t border-gray-100 bg-gray-50">
           {view === 'order' && activeOrder && (
-            <div className="p-4">
+            <div className="p-4 space-y-2">
               <button
                 type="button"
                 onClick={() => { onClose(); onGoToPayment?.() }}
                 className="w-full py-3 bg-emerald-500 hover:bg-emerald-600
-                           text-white font-semibold rounded-xl transition-colors
-                           flex items-center justify-center gap-2 text-sm"
+                          text-white font-semibold rounded-xl transition-colors
+                          flex items-center justify-center gap-2 text-sm"
               >
                 <CreditCard size={16} />
                 Ir a cobrar
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelOrder}
+                className="w-full py-2.5 border border-red-200 text-red-500
+                          hover:bg-red-50 rounded-xl text-sm transition-colors"
+              >
+                Cancelar orden y liberar mesa
               </button>
             </div>
           )}
