@@ -247,16 +247,16 @@ function MovementsModal({ item, movements, onClose }) {
                 <div className="flex items-center gap-3">
                   <div className={clsx(
                     'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0',
-                    m.type === 'in' ? 'bg-emerald-100' : 'bg-red-100'
+                    m.type === 'purchase' ? 'bg-emerald-100' : 'bg-red-100'
                   )}>
-                    {m.type === 'in'
+                    {m.type === 'purchase'
                       ? <TrendingUp size={13} className="text-emerald-600" />
                       : <TrendingDown size={13} className="text-red-500" />
                     }
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-800">
-                      {m.type === 'in' ? '+' : '-'}{m.quantity} {item.unit}
+                      {m.type === 'purchase' ? '+' : '-'}{m.quantity} {item.unit}
                     </p>
                     {m.notes && (
                       <p className="text-xs text-gray-400 truncate max-w-[160px]">
@@ -274,9 +274,9 @@ function MovementsModal({ item, movements, onClose }) {
                 {m.total_cost > 0 && (
                   <span className={clsx(
                     'text-sm font-medium',
-                    m.type === 'in' ? 'text-emerald-600' : 'text-red-500'
+                    m.type === 'purchase' ? 'text-emerald-600' : 'text-red-500'
                   )}>
-                    {m.type === 'in' ? '-' : ''}${Number(m.total_cost).toFixed(2)}
+                    {m.type === 'purchase' ? '-' : ''}${Number(m.total_cost).toFixed(2)}
                   </span>
                 )}
               </div>

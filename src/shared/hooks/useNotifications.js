@@ -110,7 +110,7 @@ export function useNotifications(role) {
         toast.success(
           `🍽️ Listo: x${quantity} ${productName}\n${tableLabel}`,
           {
-            duration: 6000,
+            duration: 3000,
             style: {
               background: '#065f46',
               color: '#fff',
