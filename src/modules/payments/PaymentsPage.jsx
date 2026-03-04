@@ -36,17 +36,38 @@ export default function PaymentsPage() {
   // Calcular promociones activas que aplican a esta orden
   const activePromos = promotions.filter(isCurrentlyActive)
 
-  // Promos de tipo 'order' — descuento sobre el total
-  const orderPromos = activePromos.filter(p => p.applies_to === 'order')
-  const autoDiscount = calcDiscount(subtotal, activePromos)
+  // Descuento de promos tipo 'order' (sobre el total)
+  const orderPromos    = activePromos.filter(p => p.applies_to === 'order')
+  const orderDiscount  = calcDiscount(subtotal, activePromos)
 
-  // Detalle de cada promo para mostrar en PaymentForm
-  const promoDetails = orderPromos.map(p => ({
-    name:   p.name,
-    amount: p.type === 'percentage'
-      ? subtotal * (p.value / 100)
-      : Math.min(p.value, subtotal)
-  }))
+  // Descuento de promos tipo 'product' (por item específico en la orden)
+  const productPromoDetails = activePromos
+    .filter(p => p.applies_to === 'product')
+    .flatMap(promo => {
+      const matchingItems = allItems.filter(i => i.products?.id === promo.product_id)
+      return matchingItems.map(item => {
+        const itemTotal = item.unit_price * item.quantity
+        const amount = promo.type === 'percentage'
+          ? itemTotal * (promo.value / 100)
+          : Math.min(promo.value * item.quantity, itemTotal)
+        return { name: `${promo.name} (${item.products?.name ?? ''})`, amount }
+      })
+    })
+    .filter(d => d.amount > 0)
+
+  const productDiscount = productPromoDetails.reduce((s, d) => s + d.amount, 0)
+  const autoDiscount    = orderDiscount + productDiscount
+
+  // Detalle completo para mostrar en PaymentForm
+  const promoDetails = [
+    ...orderPromos.map(p => ({
+      name:   p.name,
+      amount: p.type === 'percentage'
+        ? subtotal * (p.value / 100)
+        : Math.min(p.value, subtotal)
+    })),
+    ...productPromoDetails
+  ]
 
   async function handleConfirmPayment({ method, discount, total, notes, cashReceived, change }) {
     if (!selectedTable || !activeOrderId) return

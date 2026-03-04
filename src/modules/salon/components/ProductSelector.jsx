@@ -48,14 +48,15 @@ export default function ProductSelector({ categories, products, onUpdateCart, ca
         : product.price
 
       onUpdateCart([...cart, {
-        product_id:  product.id,
-        name:        product.name,
-        unit_price:  effectivePrice,
-        original_price: product.price,
-        promo_id:    promo?.id ?? null,
-        promo_name:  promo?.name ?? null,
-        quantity:    1,
-        notes:       ''
+        product_id:     product.id,
+        name:           product.name,
+        unit_price:     product.price,   // siempre precio original
+        promo_id:       promo?.id   ?? null,
+        promo_name:     promo?.name ?? null,
+        promo_type:     promo?.type ?? null,
+        promo_value:    promo?.value ?? null,
+        quantity:       1,
+        notes:          ''
       }])
     }
   }
