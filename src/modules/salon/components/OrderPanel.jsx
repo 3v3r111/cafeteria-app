@@ -11,7 +11,7 @@ const ITEM_STATUS = {
   delivered: { label: 'Entregado',  color: 'text-blue-600',    bg: 'bg-blue-100'    },
 }
 
-export default function OrderPanel({ table, categories, products, onClose, onGoToPayment }) {
+export default function OrderPanel({ table, categories, products, activePromotions = [], onClose, onGoToPayment }) {
   const { activeOrder, loading, createOrder, addItemsToOrder } = useOrders(table.id)
   const [cart, setCart] = useState([])
   const [sending, setSending] = useState(false)
@@ -116,6 +116,7 @@ export default function OrderPanel({ table, categories, products, onClose, onGoT
                 products={products}
                 cart={cart}
                 onUpdateCart={setCart}
+                activePromotions={activePromotions}
               />
             </div>
           )}

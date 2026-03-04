@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTables } from './useTables'
 import { useMenu } from '../menu/useMenu'
 import { useAuth } from '../../modules/auth/useAuth'
+import { usePromotions } from '../promotions/usePromotions'
 import TableMap from './components/TableMap'
 import TableFormModal from './components/TableFormModal'
 import OrderPanel from './components/OrderPanel'
@@ -12,10 +13,14 @@ export default function SalonPage() {
   const { isAdmin } = useAuth()
   const { tables, loading, addTable, updateTable, deleteTable, updateTableStatus } = useTables()
   const { categories, products } = useMenu()
+  const { promotions, isCurrentlyActive } = usePromotions()
 
   const [showForm, setShowForm] = useState(false)
   const [editingTable, setEditingTable] = useState(null)
   const [selectedTable, setSelectedTable] = useState(null)
+
+  // Solo pasar las promociones activas en este momento
+  const activePromotions = promotions.filter(isCurrentlyActive)
 
   function handleAdd() { setEditingTable(null); setShowForm(true) }
   function handleEdit(table) { setEditingTable(table); setShowForm(true) }
@@ -66,6 +71,7 @@ export default function SalonPage() {
           table={selectedTable}
           categories={categories}
           products={products}
+          activePromotions={activePromotions}
           onClose={() => setSelectedTable(null)}
           onGoToPayment={() => navigate('/pagos')}
         />

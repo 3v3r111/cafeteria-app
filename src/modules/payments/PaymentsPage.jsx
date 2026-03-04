@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../../modules/auth/useAuth'
 import { usePayments } from './usePayments'
+import { usePromotions } from '../promotions/usePromotions'
 import TableSelector from './components/TableSelector'
 import OrderSummary from './components/OrderSummary'
 import PaymentForm from './components/PaymentForm'
@@ -11,33 +12,49 @@ import { Receipt, AlertTriangle, Calculator } from 'lucide-react'
 import clsx from 'clsx'
 
 const ALL_TABS = [
-  { id: 'payments',      label: 'Cobro',          icon: Receipt,       roles: ['admin', 'waiter'] },
-  { id: 'cancellations', label: 'Cancelaciones',   icon: AlertTriangle, roles: ['admin']           },
-  { id: 'cash',          label: 'Corte de Caja',   icon: Calculator,    roles: ['admin', 'waiter'] },
+  { id: 'payments',      label: 'Cobro',         icon: Receipt,       roles: ['admin', 'waiter'] },
+  { id: 'cancellations', label: 'Cancelaciones',  icon: AlertTriangle, roles: ['admin']           },
+  { id: 'cash',          label: 'Corte de Caja',  icon: Calculator,    roles: ['admin', 'waiter'] },
 ]
 
 export default function PaymentsPage() {
   const { profile, isAdmin } = useAuth()
   const { occupiedTables, loading, processPayment } = usePayments()
+  const { promotions, isCurrentlyActive, calcDiscount } = usePromotions()
 
   const visibleTabs = ALL_TABS.filter(t => t.roles.includes(profile?.role))
 
-  const [activeTab, setActiveTab] = useState('payments')
+  const [activeTab, setActiveTab]         = useState('payments')
   const [selectedTable, setSelectedTable] = useState(null)
-  const [processing, setProcessing] = useState(false)
+  const [processing, setProcessing]       = useState(false)
   const [completedPayment, setCompletedPayment] = useState(null)
 
-  const allItems = selectedTable?.orders?.flatMap(o => o.order_items ?? []) ?? []
-  const subtotal = allItems.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0)
+  const allItems     = selectedTable?.orders?.flatMap(o => o.order_items ?? []) ?? []
+  const subtotal     = allItems.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0)
   const activeOrderId = selectedTable?.orders?.[0]?.id
+
+  // Calcular promociones activas que aplican a esta orden
+  const activePromos = promotions.filter(isCurrentlyActive)
+
+  // Promos de tipo 'order' — descuento sobre el total
+  const orderPromos = activePromos.filter(p => p.applies_to === 'order')
+  const autoDiscount = calcDiscount(subtotal, activePromos)
+
+  // Detalle de cada promo para mostrar en PaymentForm
+  const promoDetails = orderPromos.map(p => ({
+    name:   p.name,
+    amount: p.type === 'percentage'
+      ? subtotal * (p.value / 100)
+      : Math.min(p.value, subtotal)
+  }))
 
   async function handleConfirmPayment({ method, discount, total, notes, cashReceived, change }) {
     if (!selectedTable || !activeOrderId) return
     setProcessing(true)
     const payment = await processPayment({
-      tableId: selectedTable.id,
-      orderId: activeOrderId,
-      items: allItems,
+      tableId:       selectedTable.id,
+      orderId:       activeOrderId,
+      items:         allItems,
       subtotal,
       discount,
       total,
@@ -150,10 +167,11 @@ export default function PaymentsPage() {
                       </h2>
                       <PaymentForm
                         subtotal={subtotal}
+                        autoDiscount={autoDiscount}
+                        promoDetails={promoDetails}
                         onConfirm={handleConfirmPayment}
                         processing={processing}
                       />
-                      {/* Cancelar cobro — solo admin */}
                       {isAdmin && (
                         <button
                           type="button"

@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Plus, Minus, MessageSquare } from 'lucide-react'
+import { Plus, Minus, MessageSquare, Tag } from 'lucide-react'
 import clsx from 'clsx'
 
-export default function ProductSelector({ categories, products, onUpdateCart, cart }) {
+export default function ProductSelector({ categories, products, onUpdateCart, cart,
+                                          activePromotions = [] }) {
   const [activeCategory, setActiveCategory] = useState(categories[0]?.id ?? 'all')
   const [notes, setNotes] = useState({})
   const [showNoteFor, setShowNoteFor] = useState(null)
@@ -16,6 +17,22 @@ export default function ProductSelector({ categories, products, onUpdateCart, ca
     return cart.find(i => i.product_id === productId)
   }
 
+  // Devuelve la promo activa de tipo 'product' para un producto dado
+  function getProductPromo(productId) {
+    return activePromotions.find(p =>
+      p.applies_to === 'product' && p.product_id === productId
+    ) ?? null
+  }
+
+  // Precio con descuento aplicado
+  function getDiscountedPrice(product, promo) {
+    if (!promo) return null
+    if (promo.type === 'percentage') {
+      return product.price * (1 - promo.value / 100)
+    }
+    return Math.max(product.price - promo.value, 0)
+  }
+
   function handleAdd(product) {
     const existing = getCartItem(product.id)
     if (existing) {
@@ -25,12 +42,20 @@ export default function ProductSelector({ categories, products, onUpdateCart, ca
           : i
       ))
     } else {
+      const promo = getProductPromo(product.id)
+      const effectivePrice = promo
+        ? getDiscountedPrice(product, promo)
+        : product.price
+
       onUpdateCart([...cart, {
-        product_id: product.id,
-        name: product.name,
-        unit_price: product.price,
-        quantity: 1,
-        notes: ''
+        product_id:  product.id,
+        name:        product.name,
+        unit_price:  effectivePrice,
+        original_price: product.price,
+        promo_id:    promo?.id ?? null,
+        promo_name:  promo?.name ?? null,
+        quantity:    1,
+        notes:       ''
       }])
     }
   }
@@ -55,8 +80,31 @@ export default function ProductSelector({ categories, products, onUpdateCart, ca
     ))
   }
 
+  // Promociones de orden (aplican al total) — mostrar banner
+  const orderPromos = activePromotions.filter(p => p.applies_to === 'order')
+
   return (
     <div className="flex flex-col h-full">
+
+      {/* Banner de promos de orden */}
+      {orderPromos.length > 0 && (
+        <div className="mb-2 px-3 py-2 bg-emerald-50 border border-emerald-200
+                        rounded-xl flex items-start gap-2 flex-shrink-0">
+          <Tag size={13} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-emerald-700">
+              Promoción{orderPromos.length > 1 ? 'es' : ''} activa{orderPromos.length > 1 ? 's' : ''} en esta orden
+            </p>
+            {orderPromos.map(p => (
+              <p key={p.id} className="text-xs text-emerald-600">
+                {p.name} —{' '}
+                {p.type === 'percentage' ? `${p.value}% de descuento` : `$${p.value} de descuento`}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Categorías */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-3 flex-shrink-0">
         <button
@@ -96,19 +144,52 @@ export default function ProductSelector({ categories, products, onUpdateCart, ca
           </p>
         )}
         {filtered.map(product => {
-          const cartItem = getCartItem(product.id)
+          const cartItem  = getCartItem(product.id)
+          const promo     = getProductPromo(product.id)
+          const discPrice = promo ? getDiscountedPrice(product, promo) : null
+
           return (
             <div key={product.id}
-              className="border border-gray-100 rounded-xl p-3 hover:border-gray-200
-                         transition-colors">
+              className={clsx(
+                'border rounded-xl p-3 transition-colors',
+                promo
+                  ? 'border-emerald-200 bg-emerald-50/40'
+                  : 'border-gray-100 hover:border-gray-200'
+              )}>
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 truncate">
                     {product.name}
                   </p>
-                  <p className="text-xs text-emerald-600 font-semibold mt-0.5">
-                    ${Number(product.price).toFixed(2)}
-                  </p>
+
+                  {/* Precio con o sin promo */}
+                  {promo ? (
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs text-gray-400 line-through">
+                        ${Number(product.price).toFixed(2)}
+                      </span>
+                      <span className="text-xs text-emerald-600 font-bold">
+                        ${Number(discPrice).toFixed(2)}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-emerald-600 font-semibold mt-0.5">
+                      ${Number(product.price).toFixed(2)}
+                    </p>
+                  )}
+
+                  {/* Badge de promo */}
+                  {promo && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Tag size={10} className="text-emerald-600" />
+                      <span className="text-xs text-emerald-700 font-medium">
+                        {promo.name} —{' '}
+                        {promo.type === 'percentage'
+                          ? `${promo.value}% off`
+                          : `-$${promo.value}`}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 ml-3">
@@ -140,14 +221,11 @@ export default function ProductSelector({ categories, products, onUpdateCart, ca
                         <Minus size={13} />
                       </button>
                     )}
-
                     {cartItem && (
-                      <span className="w-6 text-center text-sm font-semibold
-                                       text-gray-800">
+                      <span className="w-6 text-center text-sm font-semibold text-gray-800">
                         {cartItem.quantity}
                       </span>
                     )}
-
                     <button
                       type="button"
                       onClick={() => handleAdd(product)}
