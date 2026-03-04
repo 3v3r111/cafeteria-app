@@ -19,8 +19,33 @@ export default function OrderPanel({ table, categories, products, activePromotio
   const [removingItem, setRemovingItem] = useState(null)
   const [removing, setRemoving] = useState(false)
 
-  const cartTotal = cart.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0)
-  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0)
+  function getItemPromo(productId) {
+    return activePromotions.find(p =>
+      p.applies_to === 'product' && p.product_id === productId
+    ) ?? null
+  }
+
+  function getItemDiscount(unitPrice, quantity, promo) {
+    if (!promo) return 0
+    const base = unitPrice * quantity
+    return promo.type === 'percentage'
+      ? base * (promo.value / 100)
+      : Math.min(promo.value * quantity, base)
+  }
+
+  const cartTotal    = cart.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0)
+  const cartCount    = cart.reduce((sum, i) => sum + i.quantity, 0)
+  const cartDiscount = cart.reduce((sum, i) => {
+    const promo = getItemPromo(i.product_id)
+    return sum + getItemDiscount(i.unit_price, i.quantity, promo)
+  }, 0)
+  const cartOrderDiscount = activePromotions
+    .filter(p => p.applies_to === 'order')
+    .reduce((sum, p) => {
+      const base = cartTotal
+      return sum + (p.type === 'percentage' ? base * (p.value / 100) : Math.min(p.value, base))
+    }, 0)
+  const totalCartDiscount = cartDiscount + cartOrderDiscount
 
   async function handleSendOrder() {
     if (cart.length === 0) return
@@ -116,7 +141,6 @@ export default function OrderPanel({ table, categories, products, activePromotio
                 products={products}
                 cart={cart}
                 onUpdateCart={setCart}
-                activePromotions={activePromotions}
               />
             </div>
           )}
@@ -162,11 +186,38 @@ export default function OrderPanel({ table, categories, products, activePromotio
                                 📝 {item.notes}
                               </p>
                             )}
+                            {(() => {
+                              const promo = getItemPromo(item.products?.id)
+                              const disc  = getItemDiscount(item.unit_price, item.quantity, promo)
+                              if (!promo) return null
+                              return (
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className="text-xs">🏷</span>
+                                  <span className="text-xs text-emerald-600 font-medium">
+                                    {promo.name} -${disc.toFixed(2)}
+                                  </span>
+                                </div>
+                              )
+                            })()}
                           </div>
                           <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                            <span className="text-xs text-gray-500">
-                              ${(item.unit_price * item.quantity).toFixed(2)}
-                            </span>
+                            {(() => {
+                              const promo = getItemPromo(item.products?.id)
+                              const disc  = getItemDiscount(item.unit_price, item.quantity, promo)
+                              const orig  = item.unit_price * item.quantity
+                              return (
+                                <div className="text-right">
+                                  {disc > 0 && (
+                                    <p className="text-xs text-gray-400 line-through leading-none">
+                                      ${orig.toFixed(2)}
+                                    </p>
+                                  )}
+                                  <span className="text-xs text-gray-700 font-medium">
+                                    ${(orig - disc).toFixed(2)}
+                                  </span>
+                                </div>
+                              )
+                            })()}
                             <span className={clsx(
                               'text-xs px-2 py-0.5 rounded-full font-medium',
                               statusCfg.bg, statusCfg.color
@@ -261,12 +312,26 @@ export default function OrderPanel({ table, categories, products, activePromotio
           {view === 'menu' && cart.length > 0 && (
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-gray-600">
-                  {cartCount} producto{cartCount !== 1 ? 's' : ''}
-                </span>
-                <span className="text-base font-bold text-gray-800">
-                  ${cartTotal.toFixed(2)}
-                </span>
+                <div>
+                  <span className="text-sm text-gray-600">
+                    {cartCount} producto{cartCount !== 1 ? 's' : ''}
+                  </span>
+                  {totalCartDiscount > 0 && (
+                    <p className="text-xs text-emerald-600 font-medium">
+                      Desc. promo: -${totalCartDiscount.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  {totalCartDiscount > 0 && (
+                    <p className="text-xs text-gray-400 line-through">
+                      ${cartTotal.toFixed(2)}
+                    </p>
+                  )}
+                  <span className="text-base font-bold text-gray-800">
+                    ${(cartTotal - totalCartDiscount).toFixed(2)}
+                  </span>
+                </div>
               </div>
               <button type="button" onClick={handleSendOrder} disabled={sending}
                 className="w-full py-3 bg-emerald-500 hover:bg-emerald-600
