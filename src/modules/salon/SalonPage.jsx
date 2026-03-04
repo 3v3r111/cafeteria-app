@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTables } from './useTables'
+import { useMenu } from '../menu/useMenu'
 import { useAuth } from '../../modules/auth/useAuth'
 import TableMap from './components/TableMap'
 import TableFormModal from './components/TableFormModal'
@@ -8,6 +9,7 @@ import OrderPanel from './components/OrderPanel'
 export default function SalonPage() {
   const { isAdmin } = useAuth()
   const { tables, loading, addTable, updateTable, deleteTable, updateTableStatus } = useTables()
+  const { categories, products } = useMenu()
 
   const [showForm, setShowForm] = useState(false)
   const [editingTable, setEditingTable] = useState(null)
@@ -19,10 +21,6 @@ export default function SalonPage() {
   async function handleSave(data) {
     if (editingTable) return await updateTable(editingTable.id, data)
     return await addTable(data)
-  }
-
-  function handleSelectTable(table) {
-    setSelectedTable(table)
   }
 
   if (loading) {
@@ -46,7 +44,7 @@ export default function SalonPage() {
       <TableMap
         tables={tables}
         isAdmin={isAdmin}
-        onSelectTable={handleSelectTable}
+        onSelectTable={setSelectedTable}
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={deleteTable}
@@ -64,6 +62,8 @@ export default function SalonPage() {
       {selectedTable && (
         <OrderPanel
           table={selectedTable}
+          categories={categories}
+          products={products}
           onClose={() => setSelectedTable(null)}
         />
       )}

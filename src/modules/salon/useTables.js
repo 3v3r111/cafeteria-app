@@ -8,38 +8,34 @@ export function useTables() {
   const debounceRef = useRef(null)
 
   const fetchTables = useCallback(async () => {
-    const timeout = setTimeout(() => setLoading(false), 8000) // timeout de seguridad
-    
+    const timeout = setTimeout(() => setLoading(false), 8000)
     const { data, error } = await supabase
       .from('tables')
       .select('*')
       .eq('is_active', true)
       .order('number', { ascending: true })
-
     clearTimeout(timeout)
     if (error) { toast.error('Error cargando mesas'); setLoading(false); return }
     setTables(data)
     setLoading(false)
   }, [])
 
-  // Fetch con debounce para agrupar múltiples eventos de Realtime
   const debouncedFetch = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      fetchTables()
-    }, 300)
+    debounceRef.current = setTimeout(() => fetchTables(), 300)
   }, [fetchTables])
 
-  // Dentro del useEffect, después de fetchTables():
   useEffect(() => {
     fetchTables()
 
-    // Escuchar sync manual
     const unsubSync = syncBus.subscribe(() => fetchTables())
 
     const channel = supabase
       .channel('tables_realtime')
-      // ... resto igual
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'tables'
+      }, () => debouncedFetch())
+      .subscribe()
 
     return () => {
       unsubSync()
@@ -49,7 +45,6 @@ export function useTables() {
   }, [fetchTables, debouncedFetch])
 
   async function renumberTables(tablesData) {
-    // Secuencial en lugar de paralelo para evitar conflictos
     for (let i = 0; i < tablesData.length; i++) {
       await supabase
         .from('tables')
@@ -62,15 +57,9 @@ export function useTables() {
     const maxNumber = tables.length > 0
       ? Math.max(...tables.map(t => t.number))
       : 0
-
     const { error } = await supabase
       .from('tables')
-      .insert({
-        ...tableData,
-        number: maxNumber + 1,
-        status: 'free'
-      })
-
+      .insert({ ...tableData, number: maxNumber + 1, status: 'free' })
     if (error) { toast.error('Error creando mesa'); return false }
     toast.success('Mesa creada')
     return true
@@ -81,7 +70,6 @@ export function useTables() {
       .from('tables')
       .update(tableData)
       .eq('id', id)
-
     if (error) { toast.error('Error actualizando mesa'); return false }
     toast.success('Mesa actualizada')
     return true
@@ -93,19 +81,15 @@ export function useTables() {
       toast.error('Solo puedes eliminar mesas que estén libres')
       return false
     }
-
     const { error } = await supabase
       .from('tables')
       .update({ is_active: false })
       .eq('id', id)
-
     if (error) { toast.error('Error eliminando mesa'); return false }
 
-    // Renumerar secuencialmente
     const remaining = tables
       .filter(t => t.id !== id)
       .sort((a, b) => a.number - b.number)
-
     await renumberTables(remaining)
 
     toast.success('Mesa eliminada')
@@ -117,18 +101,12 @@ export function useTables() {
       .from('tables')
       .update({ status })
       .eq('id', id)
-
     if (error) { toast.error('Error actualizando estado'); return false }
     return true
   }
 
   return {
-    tables,
-    loading,
-    fetchTables,
-    addTable,
-    updateTable,
-    deleteTable,
-    updateTableStatus
+    tables, loading, fetchTables,
+    addTable, updateTable, deleteTable, updateTableStatus
   }
 }

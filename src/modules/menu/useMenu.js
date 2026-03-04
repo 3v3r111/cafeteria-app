@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../../shared/lib/supabase'
+import { supabase, syncBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export function useMenu() {
@@ -50,6 +50,9 @@ export function useMenu() {
   useEffect(() => {
     fetchAll()
 
+    // Escuchar sync manual
+    const unsubSync = syncBus.subscribe(() => fetchAll())
+
     const channel = supabase
       .channel('menu_realtime')
       .on('postgres_changes', {
@@ -61,6 +64,7 @@ export function useMenu() {
       .subscribe()
 
     return () => {
+      unsubSync()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }

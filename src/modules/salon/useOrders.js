@@ -12,22 +12,14 @@ export function useOrders(tableId = null) {
     if (!tId) return
     setLoading(true)
     const timeout = setTimeout(() => setLoading(false), 8000)
-
     const { data, error } = await supabase
       .from('orders')
-      .select(`
-        *,
-        order_items (
-          *,
-          products (id, name, price)
-        )
-      `)
+      .select(`*, order_items (*, products (id, name, price))`)
       .eq('table_id', tId)
       .in('status', ['pending', 'preparing', 'ready', 'delivered'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
     clearTimeout(timeout)
     setLoading(false)
     if (error) { console.error('Error fetching order:', error); return }
@@ -36,20 +28,15 @@ export function useOrders(tableId = null) {
 
   const fetchAllActiveOrders = useCallback(async () => {
     const timeout = setTimeout(() => setLoading(false), 8000)
-
     const { data, error } = await supabase
       .from('orders')
       .select(`
         *,
         tables (number, name),
-        order_items (
-          *,
-          products (id, name, price)
-        )
+        order_items (*, products (id, name, price))
       `)
       .in('status', ['pending', 'preparing', 'ready', 'delivered'])
       .order('created_at', { ascending: true })
-
     clearTimeout(timeout)
     if (error) { console.error('Error fetching orders:', error); setLoading(false); return }
     setOrders(data ?? [])
@@ -61,8 +48,7 @@ export function useOrders(tableId = null) {
     debounceRef.current = setTimeout(fetchFn, 300)
   }, [])
 
-  // Suscripción realtime para cocina (sin tableId)
-  // En el useEffect sin tableId:
+  // Suscripción para cocina (sin tableId)
   useEffect(() => {
     if (tableId) return
     fetchAllActiveOrders()
@@ -72,7 +58,13 @@ export function useOrders(tableId = null) {
 
     const channel = supabase
       .channel('orders_kitchen')
-      // ... resto igual
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'orders'
+      }, () => debouncedFetch(fetchAllActiveOrders))
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'order_items'
+      }, () => debouncedFetch(fetchAllActiveOrders))
+      .subscribe()
 
     return () => {
       unsubSync()
@@ -81,7 +73,7 @@ export function useOrders(tableId = null) {
     }
   }, [tableId, fetchAllActiveOrders, debouncedFetch])
 
-// En el useEffect con tableId:
+  // Suscripción para mesa específica
   useEffect(() => {
     if (!tableId) return
     fetchActiveOrder(tableId)
@@ -90,7 +82,13 @@ export function useOrders(tableId = null) {
 
     const channel = supabase
       .channel(`orders_table_${tableId}`)
-      // ... resto igual
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'orders'
+      }, () => debouncedFetch(() => fetchActiveOrder(tableId)))
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'order_items'
+      }, () => debouncedFetch(() => fetchActiveOrder(tableId)))
+      .subscribe()
 
     return () => {
       unsubSync()
@@ -100,7 +98,6 @@ export function useOrders(tableId = null) {
   }, [tableId, fetchActiveOrder, debouncedFetch])
 
   async function createOrder(tId, items) {
-    // 1. Verificar que no haya orden activa ya
     const { data: existing } = await supabase
       .from('orders')
       .select('id')
@@ -109,23 +106,18 @@ export function useOrders(tableId = null) {
       .limit(1)
 
     let orderId
-
     if (existing && existing.length > 0) {
-      // Ya existe una orden, agregar items a ella
       orderId = existing[0].id
     } else {
-      // Crear nueva orden
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({ table_id: tId, status: 'pending' })
         .select()
         .single()
-
       if (orderError) { toast.error('Error creando orden'); return false }
       orderId = order.id
     }
 
-    // 2. Insertar items
     const orderItems = items.map(item => ({
       order_id: orderId,
       product_id: item.product_id,
@@ -138,10 +130,8 @@ export function useOrders(tableId = null) {
     const { error: itemsError } = await supabase
       .from('order_items')
       .insert(orderItems)
-
     if (itemsError) { toast.error('Error enviando items'); return false }
 
-    // 3. Marcar mesa como ocupada siempre que haya orden activa
     await supabase
       .from('tables')
       .update({ status: 'occupied' })
@@ -160,11 +150,7 @@ export function useOrders(tableId = null) {
       notes: item.notes || null,
       status: 'pending'
     }))
-
-    const { error } = await supabase
-      .from('order_items')
-      .insert(orderItems)
-
+    const { error } = await supabase.from('order_items').insert(orderItems)
     if (error) { toast.error('Error agregando items'); return false }
     toast.success('Items agregados a la orden')
     return true
@@ -172,20 +158,14 @@ export function useOrders(tableId = null) {
 
   async function updateOrderItemStatus(itemId, status) {
     const { error } = await supabase
-      .from('order_items')
-      .update({ status })
-      .eq('id', itemId)
-
+      .from('order_items').update({ status }).eq('id', itemId)
     if (error) { toast.error('Error actualizando item'); return false }
     return true
   }
 
   async function updateOrderStatus(orderId, status) {
     const { error } = await supabase
-      .from('orders')
-      .update({ status })
-      .eq('id', orderId)
-
+      .from('orders').update({ status }).eq('id', orderId)
     if (error) { toast.error('Error actualizando orden'); return false }
     return true
   }
@@ -194,46 +174,29 @@ export function useOrders(tableId = null) {
     const { error: cancelError } = await supabase
       .from('cancellations')
       .insert({ order_item_id: itemId, order_id: orderId, reason })
-
     if (cancelError) { toast.error('Error registrando cancelación'); return false }
 
     const { error } = await supabase
-      .from('order_items')
-      .delete()
-      .eq('id', itemId)
-
+      .from('order_items').delete().eq('id', itemId)
     if (error) { toast.error('Error cancelando item'); return false }
     toast.success('Item cancelado')
     return true
   }
 
   async function clearPaidOrders() {
-    // Marcar como paid todas las órdenes donde todos los items están listos/entregados
     const ordersToCheck = orders.filter(o =>
       o.order_items?.every(i => i.status === 'ready' || i.status === 'delivered')
     )
-
     for (const order of ordersToCheck) {
-      await supabase
-        .from('orders')
-        .update({ status: 'paid' })
-        .eq('id', order.id)
+      await supabase.from('orders').update({ status: 'paid' }).eq('id', order.id)
     }
-
     await fetchAllActiveOrders()
   }
 
   return {
-    orders,
-    activeOrder,
-    loading,
-    createOrder,
-    addItemsToOrder,
-    updateOrderItemStatus,
-    updateOrderStatus,
-    cancelOrderItem,
-    fetchActiveOrder,
-    fetchAllActiveOrders,
-    clearPaidOrders
+    orders, activeOrder, loading,
+    createOrder, addItemsToOrder, updateOrderItemStatus,
+    updateOrderStatus, cancelOrderItem, fetchActiveOrder,
+    fetchAllActiveOrders, clearPaidOrders
   }
 }

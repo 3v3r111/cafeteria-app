@@ -50,12 +50,29 @@ export default function Layout({ children }) {
   const reconnect = useCallback(() => {
     setRealtimeStatus('connecting')
     try {
-      supabase.realtime.disconnect()
-      setTimeout(() => {
-        supabase.realtime.connect()
-        setRealtimeStatus('open')
+      const currentState = supabase.realtime.connectionState()
+      
+      if (currentState === 'open') {
+        // Ya está conectado, solo refrescar datos
         syncBus.emit()
-      }, 800)
+        setRealtimeStatus('open')
+        return
+      }
+
+      // Reconectar socket
+      supabase.realtime.connect()
+      
+      // Verificar conexión después de 1 segundo
+      setTimeout(() => {
+        try {
+          const state = supabase.realtime.connectionState()
+          setRealtimeStatus(state ?? 'open')
+          syncBus.emit()
+        } catch {
+          setRealtimeStatus('open')
+          syncBus.emit()
+        }
+      }, 1000)
     } catch (e) {
       setRealtimeStatus('closed')
     }
@@ -70,14 +87,33 @@ export default function Layout({ children }) {
     }
 
     function handleVisibilityChange() {
-      if (document.visibilityState === 'visible') reconnect()
+      if (document.visibilityState === 'visible') {
+        // Primero refrescar datos inmediatamente sin esperar al socket
+        syncBus.emit()
+        
+        // Luego verificar y reconectar si es necesario
+        setTimeout(() => {
+          try {
+            const state = supabase.realtime.connectionState()
+            if (state !== 'open') {
+              reconnect()
+            } else {
+              setRealtimeStatus('open')
+            }
+          } catch {
+            reconnect()
+          }
+        }, 200)
+      }
     }
     function handleOnline() { reconnect() }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('online', handleOnline)
 
+     // Reducir intervalo a 15 segundos para detectar desconexiones más rápido
     const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
       try {
         const state = supabase.realtime.connectionState()
         setRealtimeStatus(state ?? 'open')
@@ -85,7 +121,7 @@ export default function Layout({ children }) {
       } catch {
         setRealtimeStatus('open')
       }
-    }, 30000)
+    }, 15000)
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)

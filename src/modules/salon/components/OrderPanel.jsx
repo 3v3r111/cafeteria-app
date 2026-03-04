@@ -1,23 +1,21 @@
 import { useState } from 'react'
-import { X, ShoppingCart, Send, Plus } from 'lucide-react'
-import { useMenu } from '../../menu/useMenu'
+import { X, ShoppingCart, Send } from 'lucide-react'
 import { useOrders } from '../useOrders'
 import ProductSelector from './ProductSelector'
 import clsx from 'clsx'
 
 const ITEM_STATUS = {
-  pending:   { label: 'Pendiente',    color: 'text-gray-500',   bg: 'bg-gray-100'   },
-  preparing: { label: 'Preparando',   color: 'text-amber-600',  bg: 'bg-amber-100'  },
-  ready:     { label: 'Listo',        color: 'text-emerald-600',bg: 'bg-emerald-100'},
-  delivered: { label: 'Entregado',    color: 'text-blue-600',   bg: 'bg-blue-100'   },
+  pending:   { label: 'Pendiente',  color: 'text-gray-500',    bg: 'bg-gray-100'    },
+  preparing: { label: 'Preparando', color: 'text-amber-600',   bg: 'bg-amber-100'   },
+  ready:     { label: 'Listo',      color: 'text-emerald-600', bg: 'bg-emerald-100' },
+  delivered: { label: 'Entregado',  color: 'text-blue-600',    bg: 'bg-blue-100'    },
 }
 
-export default function OrderPanel({ table, onClose }) {
-  const { categories, products } = useMenu()
+export default function OrderPanel({ table, categories, products, onClose }) {
   const { activeOrder, loading, createOrder, addItemsToOrder } = useOrders(table.id)
   const [cart, setCart] = useState([])
   const [sending, setSending] = useState(false)
-  const [view, setView] = useState('menu') // 'menu' | 'order'
+  const [view, setView] = useState('menu')
 
   const cartTotal = cart.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0)
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0)
@@ -25,19 +23,11 @@ export default function OrderPanel({ table, onClose }) {
   async function handleSendOrder() {
     if (cart.length === 0) return
     setSending(true)
-
-    let ok
-    if (activeOrder) {
-      ok = await addItemsToOrder(activeOrder.id, cart)
-    } else {
-      ok = await createOrder(table.id, cart)
-    }
-
+    const ok = activeOrder
+      ? await addItemsToOrder(activeOrder.id, cart)
+      : await createOrder(table.id, cart)
     setSending(false)
-    if (ok) {
-      setCart([])
-      setView('order')
-    }
+    if (ok) { setCart([]); setView('order') }
   }
 
   return (
@@ -52,9 +42,7 @@ export default function OrderPanel({ table, onClose }) {
               Mesa {table.number}
               {table.name && <span className="text-gray-400 ml-1">· {table.name}</span>}
             </h2>
-            <p className="text-xs text-gray-500">
-              {table.capacity} personas
-            </p>
+            <p className="text-xs text-gray-500">{table.capacity} personas</p>
           </div>
           <button type="button" onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600
@@ -65,28 +53,22 @@ export default function OrderPanel({ table, onClose }) {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-100 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setView('menu')}
+          <button type="button" onClick={() => setView('menu')}
             className={clsx(
               'flex-1 py-3 text-sm font-medium transition-colors',
               view === 'menu'
                 ? 'text-emerald-600 border-b-2 border-emerald-500'
                 : 'text-gray-500 hover:text-gray-700'
-            )}
-          >
+            )}>
             Agregar productos
           </button>
-          <button
-            type="button"
-            onClick={() => setView('order')}
+          <button type="button" onClick={() => setView('order')}
             className={clsx(
-              'flex-1 py-3 text-sm font-medium transition-colors relative',
+              'flex-1 py-3 text-sm font-medium transition-colors',
               view === 'order'
                 ? 'text-emerald-600 border-b-2 border-emerald-500'
                 : 'text-gray-500 hover:text-gray-700'
-            )}
-          >
+            )}>
             Orden activa
             {activeOrder && (
               <span className="ml-1.5 px-1.5 py-0.5 bg-emerald-100 text-emerald-700
@@ -99,7 +81,6 @@ export default function OrderPanel({ table, onClose }) {
 
         {/* Contenido */}
         <div className="flex-1 overflow-hidden flex flex-col">
-
           {view === 'menu' && (
             <div className="flex-1 overflow-hidden p-4">
               <ProductSelector
@@ -119,7 +100,6 @@ export default function OrderPanel({ table, onClose }) {
                                   border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
-
               {!loading && !activeOrder && (
                 <div className="text-center py-12 text-gray-400">
                   <ShoppingCart size={40} className="mx-auto mb-3 opacity-30" />
@@ -127,7 +107,6 @@ export default function OrderPanel({ table, onClose }) {
                   <p className="text-xs mt-1">Agrega productos desde el menú</p>
                 </div>
               )}
-
               {!loading && activeOrder && (
                 <div className="space-y-2">
                   {activeOrder.order_items?.map(item => {
@@ -171,7 +150,7 @@ export default function OrderPanel({ table, onClose }) {
           )}
         </div>
 
-        {/* Footer — carrito y botón enviar */}
+        {/* Footer */}
         {view === 'menu' && cart.length > 0 && (
           <div className="flex-shrink-0 p-4 border-t border-gray-100 bg-gray-50">
             <div className="flex items-center justify-between mb-3">
@@ -182,23 +161,16 @@ export default function OrderPanel({ table, onClose }) {
                 ${cartTotal.toFixed(2)}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={handleSendOrder}
-              disabled={sending}
+            <button type="button" onClick={handleSendOrder} disabled={sending}
               className="w-full py-3 bg-emerald-500 hover:bg-emerald-600
                          disabled:bg-emerald-300 text-white font-semibold
                          rounded-xl transition-colors flex items-center
-                         justify-center gap-2"
-            >
+                         justify-center gap-2">
               {sending ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent
                                 rounded-full animate-spin" />
               ) : (
-                <>
-                  <Send size={16} />
-                  {activeOrder ? 'Agregar a orden' : 'Enviar a cocina'}
-                </>
+                <><Send size={16} />{activeOrder ? 'Agregar a orden' : 'Enviar a cocina'}</>
               )}
             </button>
           </div>
