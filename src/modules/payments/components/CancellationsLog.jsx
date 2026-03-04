@@ -21,9 +21,12 @@ export default function CancellationsLog() {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(null)
-  const [cancelling, setCancelling] = useState(null) // { type: 'item'|'full', itemId?, paymentId, amount }
-  const [reason, setReason] = useState('')
   const [processing, setProcessing] = useState(false)
+
+  // Modal state: { type, paymentId, item?, maxQty?, amount }
+  const [cancelling, setCancelling] = useState(null)
+  const [reason, setReason] = useState('')
+  const [cancelQty, setCancelQty] = useState('1')
 
   const fetchPayments = useCallback(async () => {
     setLoading(true)
@@ -43,7 +46,8 @@ export default function CancellationsLog() {
           )
         ),
         payment_cancellations (
-          id, cancellation_type, amount, reason, created_at, order_item_id
+          id, cancellation_type, amount, reason, created_at,
+          order_item_id, cancelled_quantity
         )
       `)
       .gte('created_at', today.toISOString())
@@ -56,14 +60,53 @@ export default function CancellationsLog() {
 
   useEffect(() => { fetchPayments() }, [fetchPayments])
 
+  function getCancelledAmount(payment) {
+    return (payment.payment_cancellations ?? [])
+      .reduce((sum, c) => sum + Number(c.amount), 0)
+  }
+
+  function isFullyCancelled(payment) {
+    return getCancelledAmount(payment) >= Number(payment.total)
+  }
+
+  // Cantidad ya cancelada de un item específico
+  function getCancelledQtyForItem(payment, itemId) {
+    return (payment.payment_cancellations ?? [])
+      .filter(c => c.order_item_id === itemId)
+      .reduce((sum, c) => sum + Number(c.cancelled_quantity ?? 0), 0)
+  }
+
+  function openItemCancel(payment, item) {
+    const cancelledQty = getCancelledQtyForItem(payment, item.id)
+    const remaining = item.quantity - cancelledQty
+    if (remaining <= 0) return
+    setCancelling({
+      type: 'item',
+      paymentId: payment.id,
+      item,
+      maxQty: remaining,
+      unitPrice: item.unit_price
+    })
+    setCancelQty('1')
+    setReason('')
+  }
+
+  function openFullCancel(payment, cancelledAmt) {
+    setCancelling({
+      type: 'full',
+      paymentId: payment.id,
+      amount: Number(payment.total) - cancelledAmt
+    })
+    setReason('')
+  }
+
   async function handleCancel() {
-    if (!reason.trim()) return
+    if (!reason.trim() || !cancelling) return
     setProcessing(true)
 
     const { data: { user } } = await supabase.auth.getUser()
 
     if (cancelling.type === 'full') {
-      // Cancelar cobro completo
       const { error } = await supabase
         .from('payment_cancellations')
         .insert({
@@ -77,19 +120,27 @@ export default function CancellationsLog() {
       toast.success('Cobro cancelado')
 
     } else {
-      // Cancelar item específico
+      const qty = Number(cancelQty)
+      if (qty <= 0 || qty > cancelling.maxQty) {
+        toast.error('Cantidad inválida')
+        setProcessing(false)
+        return
+      }
+      const amount = qty * cancelling.unitPrice
+
       const { error } = await supabase
         .from('payment_cancellations')
         .insert({
           payment_id: cancelling.paymentId,
-          order_item_id: cancelling.itemId,
+          order_item_id: cancelling.item.id,
           cancellation_type: 'item',
-          amount: cancelling.amount,
+          amount,
+          cancelled_quantity: qty,
           reason: reason.trim(),
           user_id: user?.id
         })
       if (error) { toast.error('Error registrando cancelación'); setProcessing(false); return }
-      toast.success('Producto cancelado del cobro')
+      toast.success(`${qty} x ${cancelling.item.products?.name} cancelado`)
     }
 
     setProcessing(false)
@@ -98,28 +149,16 @@ export default function CancellationsLog() {
     await fetchPayments()
   }
 
-  // Calcular monto ya cancelado de un pago
-  function getCancelledAmount(payment) {
-    return (payment.payment_cancellations ?? [])
-      .reduce((sum, c) => sum + Number(c.amount), 0)
-  }
-
-  function isFullyCancelled(payment) {
-    const cancelled = getCancelledAmount(payment)
-    return cancelled >= Number(payment.total)
-  }
-
-  function isItemCancelled(payment, itemId) {
-    return (payment.payment_cancellations ?? [])
-      .some(c => c.order_item_id === itemId)
-  }
-
   const totalCancelled = payments
     .flatMap(p => p.payment_cancellations ?? [])
     .reduce((sum, c) => sum + Number(c.amount), 0)
-
   const totalSales = payments.reduce((sum, p) => sum + Number(p.total), 0)
   const netSales = totalSales - totalCancelled
+
+  // Monto cancelado en el modal
+  const modalAmount = cancelling?.type === 'full'
+    ? cancelling.amount
+    : (Number(cancelQty) || 0) * (cancelling?.unitPrice ?? 0)
 
   return (
     <div className="space-y-5">
@@ -127,9 +166,9 @@ export default function CancellationsLog() {
       {/* Resumen */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Cobros del día', value: totalSales, color: 'text-emerald-600' },
-          { label: 'Cancelaciones',  value: -totalCancelled, color: 'text-red-500'    },
-          { label: 'Neto real',      value: netSales,    color: 'text-gray-800'   },
+          { label: 'Cobros del día', value: totalSales,      color: 'text-emerald-600' },
+          { label: 'Cancelaciones',  value: -totalCancelled, color: 'text-red-500'     },
+          { label: 'Neto real',      value: netSales,        color: 'text-gray-800'    },
         ].map(({ label, value, color }) => (
           <div key={label}
             className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
@@ -171,13 +210,10 @@ export default function CancellationsLog() {
                   fullyCancelled ? 'border-red-200 opacity-60' : 'border-gray-100'
                 )}>
 
-                {/* Header del cobro */}
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => setExpanded(isExpanded ? null : payment.id)}
                   className="w-full flex items-center justify-between p-4
-                             hover:bg-gray-50 transition-colors text-left"
-                >
+                             hover:bg-gray-50 transition-colors text-left">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-gray-800">
@@ -198,8 +234,7 @@ export default function CancellationsLog() {
                       )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {formatDate(payment.created_at)} ·{' '}
-                      {PAYMENT_METHOD_LABEL[payment.payment_method]}
+                      {formatDate(payment.created_at)} · {PAYMENT_METHOD_LABEL[payment.payment_method]}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -209,7 +244,7 @@ export default function CancellationsLog() {
                       </p>
                       {cancelledAmt > 0 && (
                         <p className="text-xs text-red-500">
-                          -${cancelledAmt.toFixed(2)}
+                          -{cancelledAmt.toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -220,51 +255,47 @@ export default function CancellationsLog() {
                   </div>
                 </button>
 
-                {/* Detalle expandido */}
                 {isExpanded && (
                   <div className="border-t border-gray-100 p-4 space-y-3">
-
-                    {/* Items */}
                     <div className="space-y-2">
                       {items.map(item => {
-                        const itemCancelled = isItemCancelled(payment, item.id)
+                        const cancelledQty = getCancelledQtyForItem(payment, item.id)
+                        const remainingQty = item.quantity - cancelledQty
+                        const fullyItemCancelled = remainingQty <= 0
+
                         return (
                           <div key={item.id}
                             className={clsx(
                               'flex items-center justify-between p-2.5 rounded-xl',
-                              itemCancelled ? 'bg-red-50 opacity-60' : 'bg-gray-50'
+                              fullyItemCancelled ? 'bg-red-50 opacity-60' : 'bg-gray-50'
                             )}>
                             <div className="flex-1 min-w-0">
-                              <span className="text-sm text-gray-700">
-                                x{item.quantity} {item.products?.name}
-                              </span>
-                              {itemCancelled && (
-                                <span className="ml-2 text-xs text-red-500">
-                                  (cancelado)
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-sm text-gray-700">
+                                  x{item.quantity} {item.products?.name}
                                 </span>
+                                {cancelledQty > 0 && (
+                                  <span className="text-xs text-red-500">
+                                    ({cancelledQty} cancelado{cancelledQty > 1 ? 's' : ''})
+                                  </span>
+                                )}
+                              </div>
+                              {cancelledQty > 0 && !fullyItemCancelled && (
+                                <p className="text-xs text-amber-600 mt-0.5">
+                                  Quedan {remainingQty} activo{remainingQty > 1 ? 's' : ''}
+                                </p>
                               )}
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <span className="text-sm text-gray-600">
                                 ${(item.unit_price * item.quantity).toFixed(2)}
                               </span>
-                              {/* Botón cancelar item */}
-                              {!itemCancelled && !fullyCancelled && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setCancelling({
-                                      type: 'item',
-                                      paymentId: payment.id,
-                                      itemId: item.id,
-                                      amount: item.unit_price * item.quantity
-                                    })
-                                    setReason('')
-                                  }}
+                              {!fullyItemCancelled && !fullyCancelled && (
+                                <button type="button"
+                                  onClick={() => openItemCancel(payment, item)}
                                   className="p-1.5 text-gray-300 hover:text-red-400
                                              hover:bg-red-50 rounded-lg transition-colors"
-                                  title="Cancelar este producto"
-                                >
+                                  title="Cancelar unidades de este producto">
                                   <Trash2 size={13} />
                                 </button>
                               )}
@@ -274,22 +305,12 @@ export default function CancellationsLog() {
                       })}
                     </div>
 
-                    {/* Botón cancelar cobro completo */}
                     {!fullyCancelled && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCancelling({
-                            type: 'full',
-                            paymentId: payment.id,
-                            amount: Number(payment.total) - cancelledAmt
-                          })
-                          setReason('')
-                        }}
+                      <button type="button"
+                        onClick={() => openFullCancel(payment, cancelledAmt)}
                         className="w-full py-2 border border-red-200 text-red-500
                                    hover:bg-red-50 rounded-xl text-sm transition-colors
-                                   flex items-center justify-center gap-2"
-                      >
+                                   flex items-center justify-center gap-2">
                         <X size={14} />
                         Cancelar cobro completo
                       </button>
@@ -302,7 +323,7 @@ export default function CancellationsLog() {
         </div>
       )}
 
-      {/* Modal de justificación */}
+      {/* Modal de cancelación */}
       {cancelling && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50
                         flex items-center justify-center p-4">
@@ -310,46 +331,77 @@ export default function CancellationsLog() {
             <h3 className="text-base font-semibold text-gray-800">
               {cancelling.type === 'full'
                 ? 'Cancelar cobro completo'
-                : 'Cancelar producto del cobro'
+                : `Cancelar: ${cancelling.item?.products?.name}`
               }
             </h3>
+
+            {/* Selector de cantidad — solo para items */}
+            {cancelling.type === 'item' && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                  Cantidad a cancelar
+                  <span className="text-gray-400 font-normal ml-1">
+                    (máx. {cancelling.maxQty})
+                  </span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <button type="button"
+                    onClick={() => setCancelQty(q => String(Math.max(1, Number(q) - 1)))}
+                    className="w-9 h-9 rounded-xl border border-gray-200 text-gray-600
+                               hover:bg-gray-50 transition-colors font-bold text-lg
+                               flex items-center justify-center">
+                    −
+                  </button>
+                  <input type="number" min="1" max={cancelling.maxQty}
+                    value={cancelQty}
+                    onChange={e => {
+                      const v = Math.min(Math.max(1, Number(e.target.value)), cancelling.maxQty)
+                      setCancelQty(String(v))
+                    }}
+                    className="flex-1 text-center px-3 py-2 border border-gray-200
+                               rounded-xl text-sm focus:outline-none focus:ring-2
+                               focus:ring-red-300" />
+                  <button type="button"
+                    onClick={() => setCancelQty(q => String(Math.min(cancelling.maxQty, Number(q) + 1)))}
+                    className="w-9 h-9 rounded-xl border border-gray-200 text-gray-600
+                               hover:bg-gray-50 transition-colors font-bold text-lg
+                               flex items-center justify-center">
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
+
             <p className="text-sm text-gray-500">
               Monto a cancelar:{' '}
               <span className="font-semibold text-red-500">
-                ${Number(cancelling.amount).toFixed(2)}
+                ${modalAmount.toFixed(2)}
               </span>
             </p>
+
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1.5">
                 Justificación <span className="text-red-400">*</span>
               </label>
-              <textarea
-                value={reason}
-                onChange={e => setReason(e.target.value)}
+              <textarea value={reason} onChange={e => setReason(e.target.value)}
                 placeholder="Ej: producto agregado por error, cliente no recibió el producto..."
-                rows={3}
-                autoFocus
+                rows={3} autoFocus
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm
-                           focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
-              />
+                           focus:outline-none focus:ring-2 focus:ring-red-300 resize-none" />
             </div>
+
             <div className="flex gap-3">
-              <button
-                type="button"
+              <button type="button"
                 onClick={() => { setCancelling(null); setReason('') }}
                 className="flex-1 py-2.5 border border-gray-200 text-gray-600
-                           rounded-xl text-sm hover:bg-gray-50 transition-colors"
-              >
+                           rounded-xl text-sm hover:bg-gray-50 transition-colors">
                 No cancelar
               </button>
-              <button
-                type="button"
-                onClick={handleCancel}
+              <button type="button" onClick={handleCancel}
                 disabled={processing || !reason.trim()}
                 className="flex-1 py-2.5 bg-red-500 hover:bg-red-600
                            disabled:bg-red-300 text-white rounded-xl text-sm
-                           transition-colors flex items-center justify-center gap-2"
-              >
+                           transition-colors flex items-center justify-center gap-2">
                 {processing ? (
                   <div className="w-4 h-4 border-2 border-white
                                   border-t-transparent rounded-full animate-spin" />

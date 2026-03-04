@@ -69,7 +69,6 @@ export function useInventory() {
     }
   }, [fetchItems, fetchMovements, debouncedFetch])
 
-  // Items con alerta de stock bajo
   const lowStockItems = items.filter(i =>
     Number(i.current_stock) <= Number(i.min_stock)
   )
@@ -115,7 +114,6 @@ export function useInventory() {
     return true
   }
 
-  // Registrar entrada de stock (compra)
   async function addStock({ itemId, quantity, unitCost, notes }) {
     const item = items.find(i => i.id === itemId)
     if (!item) return false
@@ -123,9 +121,7 @@ export function useInventory() {
     const totalCost = Number(quantity) * Number(unitCost || item.cost_per_unit)
     const newStock = Number(item.current_stock) + Number(quantity)
 
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // 1. Registrar movimiento
+    // 1. Registrar movimiento (sin user_id — no existe esa columna)
     const { error: movError } = await supabase
       .from('inventory_movements')
       .insert({
@@ -134,20 +130,28 @@ export function useInventory() {
         quantity: Number(quantity),
         unit_cost: Number(unitCost || item.cost_per_unit),
         total_cost: totalCost,
-        notes: notes || null,
-        user_id: user?.id
+        notes: notes || null
       })
-    if (movError) { toast.error('Error registrando movimiento'); return false }
+    if (movError) {
+      console.error('movError:', movError)
+      toast.error('Error registrando movimiento')
+      return false
+    }
 
     // 2. Actualizar stock
     const { error: stockError } = await supabase
       .from('inventory_items')
       .update({ current_stock: newStock })
       .eq('id', itemId)
-    if (stockError) { toast.error('Error actualizando stock'); return false }
+    if (stockError) {
+      console.error('stockError:', stockError)
+      toast.error('Error actualizando stock')
+      return false
+    }
 
-    // 3. Registrar como egreso automáticamente
+    // 3. Registrar como egreso si tiene costo
     if (totalCost > 0) {
+      const { data: { user } } = await supabase.auth.getUser()
       await supabase
         .from('expenses')
         .insert({
@@ -163,7 +167,6 @@ export function useInventory() {
     return true
   }
 
-  // Registrar salida de stock (uso/merma)
   async function removeStock({ itemId, quantity, notes }) {
     const item = items.find(i => i.id === itemId)
     if (!item) return false
@@ -174,8 +177,8 @@ export function useInventory() {
     }
 
     const newStock = Number(item.current_stock) - Number(quantity)
-    const { data: { user } } = await supabase.auth.getUser()
 
+    // Sin user_id — no existe esa columna en inventory_movements
     const { error: movError } = await supabase
       .from('inventory_movements')
       .insert({
@@ -184,16 +187,23 @@ export function useInventory() {
         quantity: Number(quantity),
         unit_cost: Number(item.cost_per_unit),
         total_cost: Number(quantity) * Number(item.cost_per_unit),
-        notes: notes || null,
-        user_id: user?.id
+        notes: notes || null
       })
-    if (movError) { toast.error('Error registrando movimiento'); return false }
+    if (movError) {
+      console.error('movError:', movError)
+      toast.error('Error registrando movimiento')
+      return false
+    }
 
     const { error: stockError } = await supabase
       .from('inventory_items')
       .update({ current_stock: newStock })
       .eq('id', itemId)
-    if (stockError) { toast.error('Error actualizando stock'); return false }
+    if (stockError) {
+      console.error('stockError:', stockError)
+      toast.error('Error actualizando stock')
+      return false
+    }
 
     toast.success(`-${quantity} ${item.unit} de ${item.name}`)
     return true

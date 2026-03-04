@@ -5,7 +5,8 @@ import OrderTicket from './components/OrderTicket'
 import { Trash2 } from 'lucide-react'
 
 export default function KitchenPage() {
-  const { orders, loading, updateOrderItemStatus, updateOrderStatus, clearPaidOrders } = useOrders()
+  const { orders, loading, updateOrderItemStatus, updateOrderStatus,
+          clearPaidOrders, fetchAllActiveOrders } = useOrders()
   const [showConfirm, setShowConfirm] = useState(false)
   const [clearing, setClearing] = useState(false)
 
@@ -14,7 +15,12 @@ export default function KitchenPage() {
       .from('order_items')
       .delete()
       .eq('id', itemId)
-    if (error) console.error('Error quitando item:', error)
+    if (error) {
+      console.error('Error quitando item:', error)
+      return
+    }
+    // Forzar refetch inmediato — el canal realtime puede tardar
+    await fetchAllActiveOrders()
   }
 
   async function handleClear() {
