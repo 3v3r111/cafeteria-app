@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useOrders } from '../salon/useOrders'
+import { supabase } from '../../shared/lib/supabase'
 import OrderTicket from './components/OrderTicket'
 import { Trash2 } from 'lucide-react'
 
@@ -7,6 +8,14 @@ export default function KitchenPage() {
   const { orders, loading, updateOrderItemStatus, updateOrderStatus, clearPaidOrders } = useOrders()
   const [showConfirm, setShowConfirm] = useState(false)
   const [clearing, setClearing] = useState(false)
+
+  async function handleRemoveItem(itemId) {
+    const { error } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('id', itemId)
+    if (error) console.error('Error quitando item:', error)
+  }
 
   async function handleClear() {
     setClearing(true)
@@ -31,7 +40,6 @@ export default function KitchenPage() {
   const pendingOrders = orders.filter(o =>
     o.order_items?.some(i => i.status !== 'ready' && i.status !== 'delivered')
   )
-
   const readyOrders = orders.filter(o =>
     o.order_items?.length > 0 &&
     o.order_items?.every(i => i.status === 'ready' || i.status === 'delivered')
@@ -49,7 +57,6 @@ export default function KitchenPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
 
-      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Cocina</h1>
@@ -70,16 +77,10 @@ export default function KitchenPage() {
               </span>
             </div>
           )}
-
-          {/* Botón limpiar */}
           {orders.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowConfirm(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm
-                         text-red-500 hover:bg-red-50 border border-red-200
-                         rounded-xl transition-colors"
-            >
+            <button type="button" onClick={() => setShowConfirm(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-red-500
+                         hover:bg-red-50 border border-red-200 rounded-xl transition-colors">
               <Trash2 size={15} />
               Limpiar completadas
             </button>
@@ -87,7 +88,6 @@ export default function KitchenPage() {
         </div>
       </div>
 
-      {/* Modal de confirmación */}
       {showConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50
                         flex items-center justify-center p-4">
@@ -100,23 +100,16 @@ export default function KitchenPage() {
               estén marcados como listos. Esta acción no se puede deshacer.
             </p>
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowConfirm(false)}
+              <button type="button" onClick={() => setShowConfirm(false)}
                 disabled={clearing}
                 className="flex-1 py-2.5 border border-gray-200 text-gray-600
-                           rounded-xl text-sm hover:bg-gray-50 transition-colors"
-              >
+                           rounded-xl text-sm hover:bg-gray-50 transition-colors">
                 Cancelar
               </button>
-              <button
-                type="button"
-                onClick={handleClear}
-                disabled={clearing}
+              <button type="button" onClick={handleClear} disabled={clearing}
                 className="flex-1 py-2.5 bg-red-500 hover:bg-red-600
                            disabled:bg-red-300 text-white rounded-xl text-sm
-                           transition-colors flex items-center justify-center gap-2"
-              >
+                           transition-colors flex items-center justify-center gap-2">
                 {clearing ? (
                   <div className="w-4 h-4 border-2 border-white
                                   border-t-transparent rounded-full animate-spin" />
@@ -127,7 +120,6 @@ export default function KitchenPage() {
         </div>
       )}
 
-      {/* Órdenes */}
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-gray-400">
           <p className="text-lg font-medium">Sin órdenes pendientes</p>
@@ -141,6 +133,7 @@ export default function KitchenPage() {
               order={order}
               onUpdateItemStatus={handleUpdateItemStatus}
               onMarkAllReady={handleMarkAllReady}
+              onRemoveItem={handleRemoveItem}
             />
           ))}
         </div>

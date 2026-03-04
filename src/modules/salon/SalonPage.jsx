@@ -5,8 +5,10 @@ import { useAuth } from '../../modules/auth/useAuth'
 import TableMap from './components/TableMap'
 import TableFormModal from './components/TableFormModal'
 import OrderPanel from './components/OrderPanel'
+import { useNavigate } from 'react-router-dom'
 
 export default function SalonPage() {
+  const navigate = useNavigate()
   const { isAdmin } = useAuth()
   const { tables, loading, addTable, updateTable, deleteTable, updateTableStatus } = useTables()
   const { categories, products } = useMenu()
@@ -65,6 +67,7 @@ export default function SalonPage() {
           categories={categories}
           products={products}
           onClose={() => setSelectedTable(null)}
+          onGoToPayment={() => navigate('/pagos')}
         />
       )}
     </div>
