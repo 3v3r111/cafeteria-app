@@ -66,39 +66,33 @@ export function usePayments() {
     }
   }, [fetchOccupiedTables, debouncedFetch])
 
+  // ── Pago atómico via RPC ───────────────────────────────────────────
+  // Ejecuta insertar pago + cerrar orden + liberar mesa en una sola
+  // transacción SQL. Si cualquier paso falla, PostgreSQL hace rollback
+  // automático — nunca queda la BD en estado inconsistente.
   async function processPayment({ tableId, orderId, subtotal,
     discount, total, paymentMethod, cashReceived, change }) {
 
-    const { data: payment, error: paymentError } = await supabase
-      .from('payments')
-      .insert({
-        order_id: orderId,
-        subtotal,
-        discount_amount: discount,
-        total,
-        payment_method: paymentMethod,
-        received_amount: cashReceived ?? null,
-        change_amount: change ?? 0,
-      })
-      .select()
-      .single()
+    const { data, error } = await supabase.rpc('process_payment', {
+      p_order_id: orderId,
+      p_table_id: tableId,
+      p_subtotal: subtotal,
+      p_discount: discount ?? 0,
+      p_total:    total,
+      p_method:   paymentMethod,
+      p_received: cashReceived ?? null,
+      p_change:   change ?? 0,
+    })
 
-    if (paymentError) {
-      console.error('Payment error:', paymentError)
-      toast.error('Error registrando pago')
+    if (error) {
+      console.error('Error en process_payment RPC:', error)
+      toast.error('Error registrando pago — intenta de nuevo')
       return null
     }
 
-    const { error: orderError } = await supabase
-      .from('orders').update({ status: 'paid' }).eq('id', orderId)
-    if (orderError) { toast.error('Error cerrando orden'); return null }
-
-    const { error: tableError } = await supabase
-      .from('tables').update({ status: 'free' }).eq('id', tableId)
-    if (tableError) { toast.error('Error liberando mesa'); return null }
-
     toast.success('Pago registrado correctamente')
-    return payment
+    // La función RPC devuelve el registro de payment como JSON
+    return typeof data === 'string' ? JSON.parse(data) : data
   }
 
   async function getRecentPayments(limit = 20) {
