@@ -141,6 +141,7 @@ export default function OrderPanel({ table, categories, products, activePromotio
                 products={products}
                 cart={cart}
                 onUpdateCart={setCart}
+                activePromotions={activePromotions}
               />
             </div>
           )}
