@@ -143,7 +143,7 @@ export default function TicketModal({ payment, table, items, onClose }) {
   const change   = Number(payment.change_amount ?? 0)
 
   // Nombre del negocio — puedes personalizarlo aquí
-  const BUSINESS_NAME = 'CAFETERÍA'
+  const BUSINESS_NAME = 'Clave 878'
   const BUSINESS_SUB  = 'Sistema de Gestión Interno'
   const FOOTER_MSG    = '¡Gracias por su visita!'
 
