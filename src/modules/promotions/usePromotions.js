@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, syncBus } from '../../shared/lib/supabase'
+import { supabase, syncBus, visibilityBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export const DAYS = [
@@ -40,7 +40,8 @@ export function usePromotions() {
     fetchPromotions()
     fetchProducts()
 
-    const unsubSync = syncBus.subscribe(() => fetchPromotions())
+    const unsubSync       = syncBus.subscribe(() => fetchPromotions())
+    const unsubVisibility = visibilityBus.subscribe(() => fetchPromotions())
     const channel = supabase
       .channel('promotions_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'promotions' },

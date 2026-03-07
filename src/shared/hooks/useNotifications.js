@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, visibilityBus } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export function useNotifications(role) {
@@ -121,7 +121,17 @@ export function useNotifications(role) {
       })
       .subscribe()
 
-    return () => supabase.removeChannel(channel)
+    // Reconectar canal al volver al primer plano
+    const unsubVisibility = visibilityBus.subscribe(() => {
+      supabase.removeChannel(channel)
+      // El canal se recrea al volver a ejecutar el efecto
+      // forzando re-suscripción limpia
+    })
+
+    return () => {
+      unsubVisibility()
+      supabase.removeChannel(channel)
+    }
   }, [role])
 
   const unreadCount = notifications.filter(n => !n.read).length

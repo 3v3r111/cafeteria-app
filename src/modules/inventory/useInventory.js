@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase, syncBus } from '../../shared/lib/supabase'
+import { supabase, syncBus, visibilityBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export function useInventory() {
@@ -44,7 +44,8 @@ export function useInventory() {
     fetchItems()
     fetchMovements()
 
-    const unsubSync = syncBus.subscribe(() => {
+    const unsubSync       = syncBus.subscribe(() => { fetchItems(); fetchMovements() })
+    const unsubVisibility = visibilityBus.subscribe(() => {
       fetchItems()
       fetchMovements()
     })
@@ -64,6 +65,7 @@ export function useInventory() {
 
     return () => {
       unsubSync()
+      unsubVisibility()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }

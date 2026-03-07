@@ -29,7 +29,7 @@ export async function fetchWithRetry(fetchFn, maxRetries = 3) {
   return { data: null, error: new Error('Max retries reached') }
 }
 
-// Event bus para sincronización manual
+// Event bus para sincronización manual entre módulos
 export const syncBus = {
   listeners: new Set(),
   emit() {
@@ -39,4 +39,27 @@ export const syncBus = {
     this.listeners.add(fn)
     return () => this.listeners.delete(fn)
   }
+}
+
+// Bus de visibilidad — se dispara cuando el usuario vuelve a la app
+// después de tenerla en segundo plano o cambiar de pestaña.
+// Cada hook se suscribe para hacer refetch y reconectar canales.
+export const visibilityBus = {
+  listeners: new Set(),
+  emit() {
+    this.listeners.forEach(fn => fn())
+  },
+  subscribe(fn) {
+    this.listeners.add(fn)
+    return () => this.listeners.delete(fn)
+  }
+}
+
+// Registrar el listener de visibilidad una sola vez globalmente
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      visibilityBus.emit()
+    }
+  })
 }
