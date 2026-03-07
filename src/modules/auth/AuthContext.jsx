@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('id', userId)   // ← el campo PK es 'id', igual a auth.uid()
+      .eq('user_id', userId)  // ← user_id es el campo que referencia auth.uid()
       .single()
 
     if (error) {
