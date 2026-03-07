@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase, syncBus, visibilityBus } from '../../shared/lib/supabase'
+import { supabase, syncBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export function useMenu() {
@@ -52,7 +52,6 @@ export function useMenu() {
 
     // Escuchar sync manual
     const unsubSync       = syncBus.subscribe(() => fetchAll())
-    const unsubVisibility = visibilityBus.subscribe(() => fetchAll())
 
     const channel = supabase
       .channel('menu_realtime')
@@ -66,7 +65,6 @@ export function useMenu() {
 
     return () => {
       unsubSync()
-      unsubVisibility()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }

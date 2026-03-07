@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase, syncBus, visibilityBus } from '../../shared/lib/supabase'
+import { supabase, syncBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export function useOrders(tableId = null) {
@@ -55,7 +55,6 @@ export function useOrders(tableId = null) {
     setLoading(true)
 
     const unsubSync       = syncBus.subscribe(() => fetchAllActiveOrders())
-    const unsubVisibility = visibilityBus.subscribe(() => fetchAllActiveOrders())
 
     const channel = supabase
       .channel('orders_kitchen')
@@ -69,7 +68,6 @@ export function useOrders(tableId = null) {
 
     return () => {
       unsubSync()
-      unsubVisibility()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }
@@ -81,7 +79,6 @@ export function useOrders(tableId = null) {
     fetchActiveOrder(tableId)
 
     const unsubSync       = syncBus.subscribe(() => fetchActiveOrder(tableId))
-    const unsubVisibility = visibilityBus.subscribe(() => fetchActiveOrder(tableId))
 
     const channel = supabase
       .channel(`orders_table_${tableId}`)
@@ -95,7 +92,6 @@ export function useOrders(tableId = null) {
 
     return () => {
       unsubSync()
-      unsubVisibility()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }

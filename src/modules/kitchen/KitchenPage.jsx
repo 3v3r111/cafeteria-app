@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePageFocus } from '../../shared/hooks/usePageFocus'
 import { useOrders } from '../salon/useOrders'
 import { supabase } from '../../shared/lib/supabase'
 import OrderTicket from './components/OrderTicket'
@@ -7,6 +8,7 @@ import { Trash2 } from 'lucide-react'
 export default function KitchenPage() {
   const { orders, loading, updateOrderItemStatus, updateOrderStatus,
           clearPaidOrders, fetchAllActiveOrders } = useOrders()
+  usePageFocus(() => fetchAllActiveOrders())
   const [showConfirm, setShowConfirm] = useState(false)
   const [clearing, setClearing] = useState(false)
 

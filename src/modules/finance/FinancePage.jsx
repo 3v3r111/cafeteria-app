@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { usePageFocus } from '../../shared/hooks/usePageFocus'
 import { useFinance, EXPENSE_CATEGORIES } from './useFinance'
 import {
   TrendingUp, TrendingDown, DollarSign, Percent,

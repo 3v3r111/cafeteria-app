@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase, syncBus, visibilityBus } from '../../shared/lib/supabase'
+import { supabase, syncBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export function useTables() {
@@ -29,7 +29,6 @@ export function useTables() {
     fetchTables()
 
     const unsubSync       = syncBus.subscribe(() => fetchTables())
-    const unsubVisibility = visibilityBus.subscribe(() => fetchTables())
 
     const channel = supabase
       .channel('tables_realtime')
@@ -40,7 +39,6 @@ export function useTables() {
 
     return () => {
       unsubSync()
-      unsubVisibility()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }

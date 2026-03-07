@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePageFocus } from '../../shared/hooks/usePageFocus'
 import { useAuth } from '../../modules/auth/useAuth'
 import { usePayments } from './usePayments'
 import { usePromotions } from '../promotions/usePromotions'
@@ -19,7 +20,8 @@ const ALL_TABS = [
 
 export default function PaymentsPage() {
   const { profile, isAdmin } = useAuth()
-  const { occupiedTables, loading, processPayment } = usePayments()
+  const { occupiedTables, loading, processPayment, fetchOccupiedTables } = usePayments()
+  usePageFocus(() => fetchOccupiedTables())
   const { promotions, isCurrentlyActive, calcDiscount } = usePromotions()
 
   const visibleTabs = ALL_TABS.filter(t => t.roles.includes(profile?.role))

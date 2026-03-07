@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePageFocus } from '../../shared/hooks/usePageFocus'
 import { useTables } from './useTables'
 import { useMenu } from '../menu/useMenu'
 import { useAuth } from '../../modules/auth/useAuth'
@@ -11,9 +12,10 @@ import { useNavigate } from 'react-router-dom'
 export default function SalonPage() {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
-  const { tables, loading, addTable, updateTable, deleteTable, updateTableStatus } = useTables()
+  const { tables, loading, fetchTables, addTable, updateTable, deleteTable, updateTableStatus } = useTables()
   const { categories, products } = useMenu()
   const { promotions, isCurrentlyActive } = usePromotions()
+  usePageFocus(() => fetchTables())
 
   const [showForm, setShowForm] = useState(false)
   const [editingTable, setEditingTable] = useState(null)

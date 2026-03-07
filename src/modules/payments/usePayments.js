@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase, syncBus, visibilityBus } from '../../shared/lib/supabase'
+import { supabase, syncBus } from '../../shared/lib/supabase'
 import toast from 'react-hot-toast'
 
 export function usePayments() {
@@ -45,7 +45,6 @@ export function usePayments() {
     fetchOccupiedTables()
 
     const unsubSync       = syncBus.subscribe(() => fetchOccupiedTables())
-    const unsubVisibility = visibilityBus.subscribe(() => fetchOccupiedTables())
 
     const channel = supabase
       .channel('payments_realtime')
@@ -62,7 +61,6 @@ export function usePayments() {
 
     return () => {
       unsubSync()
-      unsubVisibility()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(channel)
     }

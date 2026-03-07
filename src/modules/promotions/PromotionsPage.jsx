@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePageFocus } from '../../shared/hooks/usePageFocus'
 import { usePromotions, DAYS } from './usePromotions'
 import { Plus, Edit2, Trash2, Tag, ToggleLeft, ToggleRight,
          Calendar, Clock, X, CheckCircle, Percent, DollarSign } from 'lucide-react'
@@ -440,8 +441,9 @@ export default function PromotionsPage() {
   const {
     promotions, products, loading, activeNow,
     addPromotion, updatePromotion, togglePromotion, deletePromotion,
-    isCurrentlyActive,
+    isCurrentlyActive, fetchPromotions,
   } = usePromotions()
+  usePageFocus(() => fetchPromotions())
 
   const [showModal, setShowModal]   = useState(false)
   const [editingPromo, setEditing]  = useState(null)

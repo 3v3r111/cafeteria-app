@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePageFocus } from '../../shared/hooks/usePageFocus'
 import { useInventory } from './useInventory'
 import { Package, AlertTriangle, Plus, TrendingUp,
          TrendingDown, Edit2, Trash2, History } from 'lucide-react'
@@ -291,7 +292,8 @@ function MovementsModal({ item, movements, onClose }) {
 export default function InventoryPage() {
   const { items, movements, loading, lowStockItems,
           fetchMovements, addItem, updateItem, deleteItem,
-          addStock, removeStock } = useInventory()
+          addStock, removeStock, fetchItems } = useInventory()
+  usePageFocus(() => fetchItems())
 
   const [showForm, setShowForm] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
