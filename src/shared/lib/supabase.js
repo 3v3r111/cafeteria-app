@@ -55,11 +55,13 @@ export const visibilityBus = {
   }
 }
 
-// Registrar el listener de visibilidad una sola vez globalmente
+// Registrar el listener de visibilidad una sola vez globalmente.
+// El delay de 300ms da tiempo a Supabase de restaurar la sesión
+// antes de que los hooks intenten hacer fetch.
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      visibilityBus.emit()
+      setTimeout(() => visibilityBus.emit(), 300)
     }
   })
 }
