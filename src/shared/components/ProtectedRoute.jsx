@@ -37,12 +37,18 @@ function ProfileErrorScreen({ onSignOut }) {
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { user, profile, loading, signOut } = useAuth()
 
+  // Carga inicial
   if (loading) return <LoadingScreen />
 
+  // Sin sesión — ir al login
   if (!user) return <Navigate to="/login" replace />
 
-  // Hay sesión pero no hay perfil — mostrar error en lugar de redirigir
-  if (!profile) return <ProfileErrorScreen onSignOut={signOut} />
+  // Hay user pero profile aún no cargó (transición breve al volver
+  // al primer plano) — mostrar spinner en lugar de desmontar la página
+  if (!profile) return <LoadingScreen />
+
+  // Perfil cargado pero sin rol válido (cuenta sin perfil real)
+  if (!profile.role) return <ProfileErrorScreen onSignOut={signOut} />
 
   if (allowedRoles && !allowedRoles.includes(profile.role)) {
     return <Navigate to="/no-autorizado" replace />
